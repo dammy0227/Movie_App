@@ -44,7 +44,7 @@ const LandingPage = () => {
             alt="Background"
             className="w-full h-screen object-cover"
           />
-          <div className="absolute inset-0 bg-linear-to-r from-black/80 to-black/80" />
+          <div className="absolute inset-0 bg-linear-to-r from-black/70 to-black/70" />
         </motion.div>
 
         {/* Header */}
