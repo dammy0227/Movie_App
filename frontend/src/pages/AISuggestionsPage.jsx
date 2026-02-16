@@ -24,7 +24,7 @@ const AISuggestionsPage = () => {
   const navigate = useNavigate();
   const [selectedMood, setSelectedMood] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'modal'
+  const [viewMode, setViewMode] = useState('grid'); 
   
   const aiState = useSelector((state) => state.ai || {});
   const { 
@@ -36,7 +36,7 @@ const AISuggestionsPage = () => {
   const handleMoodClick = (mood) => {
     setSelectedMood(mood);
     dispatch(fetchRecommendation({ prompt: mood.prompt }));
-    setShowModal(true); // Show modal by default
+    setShowModal(true);
   };
 
 
