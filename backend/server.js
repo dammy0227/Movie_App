@@ -20,7 +20,7 @@ const app = express();
 
 app.use(cors({
   origin: [
-    "https://movie-app-eight-rho-22.vercel.app/",
+    "https://movie-app-eight-rho-22.vercel.app",
     "http://localhost:5173"
   ],
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
