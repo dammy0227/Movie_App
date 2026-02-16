@@ -56,7 +56,7 @@ const AISuggestionsPage = () => {
       
       <div className="pt-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col lg:flex-row items-center justify-between mb-8 gap-5">
           <div className="flex items-center">
             <Sparkles className="w-8 h-8 text-yellow-400 mr-3" />
             <h1 className="text-3xl sm:text-4xl font-bold text-white">AI Movie Suggestions</h1>

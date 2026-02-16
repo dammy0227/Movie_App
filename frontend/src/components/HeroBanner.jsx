@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Info, Play, ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -7,49 +7,85 @@ const HeroBanner = ({ items = [] }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isVisible, setIsVisible] = useState(true);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const intervalRef = useRef(null);
 
-  // Auto-play functionality
-  useEffect(() => {
-    if (!isAutoPlaying || items.length <= 1) return;
+  // Clear and reset interval function
+  const resetInterval = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
     
-    const interval = setInterval(() => {
-     
-    }, 5000); 
+    if (isAutoPlaying && items.length > 1) {
+      intervalRef.current = setInterval(() => {
+        handleNext();
+      }, 5000);
+    }
+  }, [isAutoPlaying, items.length]);
 
-    return () => clearInterval(interval);
-  }, [currentIndex, isAutoPlaying, items.length]);
-
-  const handlePrevious = () => {
-    setIsVisible(false);
-    setIsAutoPlaying(false);
-    setTimeout(() => {
-      setCurrentIndex((prev) => (prev === 0 ? items.length - 1 : prev - 1));
-      setIsVisible(true);
-    }, 300);
-  };
-
-  const handleNext = () => {
+  // Handle next slide
+  const handleNext = useCallback(() => {
+    if (items.length === 0) return;
+    
     setIsVisible(false);
     setTimeout(() => {
       setCurrentIndex((prev) => (prev === items.length - 1 ? 0 : prev + 1));
       setIsVisible(true);
     }, 300);
-  };
+  }, [items.length]);
 
-  const handleDotClick = (index) => {
-    if (index === currentIndex) return;
+  // Handle previous slide
+  const handlePrevious = useCallback(() => {
+    if (items.length === 0) return;
+    
+    setIsVisible(false);
+    setTimeout(() => {
+      setCurrentIndex((prev) => (prev === 0 ? items.length - 1 : prev - 1));
+      setIsVisible(true);
+    }, 300);
+  }, [items.length]);
+
+  // Handle dot click
+  const handleDotClick = useCallback((index) => {
+    if (index === currentIndex || items.length === 0) return;
+    
     setIsVisible(false);
     setIsAutoPlaying(false);
     setTimeout(() => {
       setCurrentIndex(index);
       setIsVisible(true);
     }, 300);
-  };
+  }, [currentIndex, items.length]);
 
-  const handleMouseEnter = () => setIsAutoPlaying(false);
-  const handleMouseLeave = () => setIsAutoPlaying(true);
+  // Mouse enter/leave handlers
+  const handleMouseEnter = useCallback(() => {
+    setIsAutoPlaying(false);
+  }, []);
 
-  if (!items || items.length === 0) return null;
+  const handleMouseLeave = useCallback(() => {
+    setIsAutoPlaying(true);
+  }, []);
+
+  // Reset interval when auto-play state or items change
+  useEffect(() => {
+    resetInterval();
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [isAutoPlaying, items.length, resetInterval]);
+
+  // Reset index when items change (optional)
+  useEffect(() => {
+    setCurrentIndex(0);
+    setIsVisible(true);
+  }, [items]);
+
+  // If no items, don't render
+  if (!items || items.length === 0) {
+    return null;
+  }
 
   const currentItem = items[currentIndex];
   const title = currentItem.type === 'tv' ? currentItem.name : currentItem.title;
@@ -58,34 +94,38 @@ const HeroBanner = ({ items = [] }) => {
 
   return (
     <div 
-      className="relative h-[80vh] w-full overflow-hidden"
+      className="relative h-[80vh] w-full overflow-hidden group"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
       {/* Background Image */}
       <div className="absolute inset-0">
         <img
+          key={currentItem.id}
           src={`https://image.tmdb.org/t/p/original${currentItem.backdrop_path}`}
           alt={title}
-          className="w-full h-full object-cover transition-transform duration-7000 scale-105 hover:scale-110"
+          className="w-full h-full object-cover transition-transform duration-10000 scale-105 hover:scale-110"
+          onError={(e) => {
+            e.target.src = 'https://via.placeholder.com/1920x1080?text=No+Image';
+          }}
         />
         <div className="absolute inset-0 bg-linear-to-r from-black via-black/70 to-transparent" />
         <div className="absolute inset-0 bg-linear-to-t from-black via-transparent to-transparent" />
       </div>
 
-      {/* Navigation Arrows */}
+      {/* Navigation Arrows - Always visible on mobile, on hover on desktop */}
       {items.length > 1 && (
         <>
           <button
             onClick={handlePrevious}
-            className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-black/30 hover:bg-black/60 text-white p-3 rounded-full transition-all opacity-0 group-hover:opacity-100 hover:scale-110"
+            className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/80 text-white p-3 rounded-full transition-all duration-300 opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 sm:opacity-50 sm:group-hover:opacity-100 hover:scale-110"
             aria-label="Previous"
           >
             <ChevronLeft className="w-6 h-6" />
           </button>
           <button
             onClick={handleNext}
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-black/30 hover:bg-black/60 text-white p-3 rounded-full transition-all opacity-0 group-hover:opacity-100 hover:scale-110"
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/80 text-white p-3 rounded-full transition-all duration-300 opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 sm:opacity-50 sm:group-hover:opacity-100 hover:scale-110"
             aria-label="Next"
           >
             <ChevronRight className="w-6 h-6" />

@@ -144,7 +144,7 @@ const Dashboard = () => {
       )}
 
       {/* Main Content */}
-      <div className="relative z-10 -mt-32">
+      <div className="relative z-10 -mt-22">
         {/* AI Suggestions Section */}
         <AISuggestions />
 

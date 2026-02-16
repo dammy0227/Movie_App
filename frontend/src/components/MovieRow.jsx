@@ -30,7 +30,7 @@ const MovieRow = ({ title, movies, onMovieClick }) => {
   }
 
   return (
-    <div className="space-y-2 py-4">
+    <div className="space-y-2">
       <h2 className="text-xl sm:text-2xl font-bold text-white px-4 sm:px-6 lg:px-8">
         {title} <span className="text-sm text-gray-400 ml-2">({movies.length} movies)</span>
       </h2>
