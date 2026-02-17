@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
 import { login } from '../features/auth/authSlice';
+import GoogleButton from '../components/GoogleButton'; 
 
 const Login = () => {
   const dispatch = useDispatch();
@@ -83,6 +84,18 @@ const Login = () => {
             {loading ? 'Signing In...' : 'Sign In'}
           </button>
         </form>
+
+        {/* ADD THIS DIVIDER AND GOOGLE BUTTON */}
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-600"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-black/80 text-gray-400">Or continue with</span>
+          </div>
+        </div>
+
+        <GoogleButton text="Sign in with Google" />
 
         <p className="mt-4 text-gray-400">
           New to Movie Box?{' '}

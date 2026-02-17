@@ -1,29 +1,44 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchTVDetails } from '../features/tv/tvSlice';
 import { fetchSummary } from '../features/ai/aiSlice';
 import { addWatchlist } from '../features/user/userSlice';
+import { 
+  fetchItemRating, 
+  fetchAverageRating, 
+  rateMovie,
+  updateUserRating,
+  removeRating 
+} from '../features/rating/ratingSlice';
 import Navbar from '../components/Navbar';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
-import { Heart, Star, Calendar, Film, Play, Sparkles, X } from 'lucide-react';
+import RatingModal from '../components/RatingModal';
+import RatingDisplay from '../components/RatingDisplay';
+import { Heart, Star, Calendar, Film, Play, Sparkles, X, Volume2, VolumeX } from 'lucide-react';
 
 const TVDetail = () => {
   const { id } = useParams();
   const dispatch = useDispatch();
-  const [showTrailer, setShowTrailer] = useState(false);
   const [showAISummary, setShowAISummary] = useState(false);
   const [trailerKey, setTrailerKey] = useState('');
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+  const [showTrailerInHero, setShowTrailerInHero] = useState(false);
+  const iframeRef = useRef(null);
 
   const { details, loading, error } = useSelector((state) => state.tv || {});
   const { summary, loading: aiLoading } = useSelector((state) => state.ai || {});
+  const { itemRatings, averageRatings } = useSelector((state) => state.rating);
 
   useEffect(() => {
     dispatch(fetchTVDetails(id));
+    dispatch(fetchItemRating(id));
+    dispatch(fetchAverageRating(id));
   }, [dispatch, id]);
 
-  // Extract trailer key using useMemo instead of useEffect with setState
+  // Extract trailer key
   const extractedTrailerKey = useMemo(() => {
     if (details?.videos?.results) {
       const trailer = details.videos.results.find(
@@ -34,9 +49,12 @@ const TVDetail = () => {
     return '';
   }, [details]);
 
-  // Update trailerKey when extracted key changes
+  // Auto-play trailer when page loads
   useEffect(() => {
-    setTrailerKey(extractedTrailerKey);
+    if (extractedTrailerKey) {
+      setTrailerKey(extractedTrailerKey);
+      setShowTrailerInHero(true);
+    }
   }, [extractedTrailerKey]);
 
   const handleAddToWatchlist = useCallback(() => {
@@ -57,15 +75,44 @@ const TVDetail = () => {
     setShowAISummary(!showAISummary);
   }, [dispatch, details, showAISummary]);
 
-  const handleWatchTrailer = useCallback(() => {
-    if (trailerKey) {
-      setShowTrailer(true);
-    }
-  }, [trailerKey]);
+  const toggleMute = () => {
+    setIsMuted(!isMuted);
+  };
 
-  const handleCloseTrailer = useCallback(() => {
-    setShowTrailer(false);
-  }, []);
+  const handleRatingSubmit = async ({ rating, review }) => {
+    const currentRating = itemRatings[id];
+    
+    if (currentRating?.userRating) {
+      await dispatch(updateUserRating({ 
+        tmdbId: id, 
+        rating, 
+        review 
+      }));
+    } else {
+      await dispatch(rateMovie({
+        tmdbId: details.id,
+        title: details.name,
+        poster: details.poster_path,
+        rating,
+        review,
+        media_type: 'tv'
+      }));
+    }
+    
+    dispatch(fetchItemRating(id));
+    dispatch(fetchAverageRating(id));
+    setShowRatingModal(false);
+  };
+
+  const handleRemoveRating = async () => {
+    if (window.confirm('Remove your rating?')) {
+      await dispatch(removeRating(id));
+      dispatch(fetchItemRating(id));
+      dispatch(fetchAverageRating(id));
+    }
+  };
+
+  const currentRating = itemRatings[id];
 
   if (loading) return (
     <div className="min-h-screen bg-black">
@@ -88,15 +135,48 @@ const TVDetail = () => {
   return (
     <div className="min-h-screen bg-black">
       <Navbar />
-      <div className="relative h-[60vh] w-full">
-        <img
-          src={`https://image.tmdb.org/t/p/original${details.backdrop_path}`}
-          alt={details.name}
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-linear-to-t from-black via-black/50 to-transparent" />
+      
+      {/* Hero Section with Trailer or Backdrop */}
+      <div className="relative h-[70vh] w-full overflow-hidden">
+        {showTrailerInHero && trailerKey ? (
+          <>
+            <iframe
+              ref={iframeRef}
+              src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1&mute=${isMuted ? 1 : 0}&controls=0&showinfo=0&rel=0&loop=1&playlist=${trailerKey}&modestbranding=1`}
+              className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[calc(100%+100px)] h-[calc(100%+100px)] pointer-events-none"
+              style={{ 
+                objectFit: 'cover',
+                pointerEvents: 'none'
+              }}
+              allow="autoplay; encrypted-media"
+              title={`${details.name} Trailer`}
+            />
+            <div className="absolute inset-0 bg-linear-to-t from-black via-black/50 to-transparent" />
+            
+            <button
+              onClick={toggleMute}
+              className="absolute bottom-24 right-8 z-20 bg-black/50 p-3 rounded-full hover:bg-black/70 transition"
+            >
+              {isMuted ? (
+                <VolumeX className="w-6 h-6 text-white" />
+              ) : (
+                <Volume2 className="w-6 h-6 text-white" />
+              )}
+            </button>
+          </>
+        ) : (
+          <>
+            <img
+              src={`https://image.tmdb.org/t/p/original${details.backdrop_path}`}
+              alt={details.name}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-linear-to-t from-black via-black/50 to-transparent" />
+          </>
+        )}
       </div>
 
+      {/* TV Show Details (rest remains the same) */}
       <div className="relative z-10 max-w-7xl mx-auto px-4 -mt-48 pb-16">
         <div className="flex flex-col md:flex-row gap-8">
           <div className="md:w-1/3 lg:w-1/4">
@@ -134,6 +214,25 @@ const TVDetail = () => {
               ))}
             </div>
 
+            <div className="mb-6">
+              <RatingDisplay
+                userRating={currentRating?.userRating}
+                averageRating={averageRatings[id]?.average}
+                totalRatings={averageRatings[id]?.total}
+                onRateClick={() => setShowRatingModal(true)}
+                isRated={!!currentRating?.userRating}
+              />
+              
+              {currentRating?.userRating && (
+                <button
+                  onClick={handleRemoveRating}
+                  className="mt-2 text-sm text-gray-400 hover:text-red-600 transition"
+                >
+                  Remove my rating
+                </button>
+              )}
+            </div>
+
             <p className="text-gray-300 leading-relaxed mb-8">{details.overview}</p>
 
             <div className="flex flex-wrap gap-4">
@@ -152,20 +251,8 @@ const TVDetail = () => {
                 <Sparkles className="w-5 h-5 mr-2" />
                 AI Summary
               </button>
-              
-              <button
-                onClick={handleWatchTrailer}
-                disabled={!trailerKey}
-                className={`flex items-center px-6 py-3 rounded-lg transition ${
-                  trailerKey ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-800/50 cursor-not-allowed'
-                }`}
-              >
-                <Play className="w-5 h-5 mr-2" />
-                {trailerKey ? 'Watch Trailer' : 'No Trailer Available'}
-              </button>
             </div>
 
-            {/* AI Summary Display */}
             {showAISummary && (
               <div className="mt-6 p-4 bg-purple-600/20 border border-purple-600 rounded-lg">
                 <h3 className="text-lg font-semibold text-purple-400 mb-2 flex items-center">
@@ -179,31 +266,25 @@ const TVDetail = () => {
                 )}
               </div>
             )}
+
+            {currentRating?.review && (
+              <div className="mt-4 p-4 bg-gray-800/50 rounded-lg">
+                <h3 className="text-sm font-semibold text-gray-400 mb-1">Your Review</h3>
+                <p className="text-white">"{currentRating.review}"</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Trailer Modal */}
-      {showTrailer && trailerKey && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95">
-          <div className="relative w-full max-w-6xl">
-            <button
-              onClick={handleCloseTrailer}
-              className="absolute -top-12 right-0 text-white hover:text-red-600 transition flex items-center gap-2"
-            >
-              <span>Close</span>
-              <X className="w-6 h-6" />
-            </button>
-            <div className="relative pt-[56.25%]">
-              <iframe
-                src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1`}
-                className="absolute top-0 left-0 w-full h-full"
-                allowFullScreen
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      <RatingModal
+        isOpen={showRatingModal}
+        onClose={() => setShowRatingModal(false)}
+        onSubmit={handleRatingSubmit}
+        itemTitle={details.name}
+        currentRating={currentRating?.userRating}
+        currentReview={currentRating?.review}
+      />
     </div>
   );
 };

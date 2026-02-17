@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../features/auth/authSlice';
-import { Search, Film, Tv, User, LogOut, Menu, X, Sparkles } from 'lucide-react';
+import { Search, Film, Tv, User, LogOut, Menu, X, Sparkles, Star } from 'lucide-react'; // Added Star
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -14,7 +14,6 @@ const Navbar = () => {
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      // Updated to use multi-search endpoint
       navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
       setSearchQuery('');
       setIsOpen(false);
@@ -88,6 +87,12 @@ const Navbar = () => {
 
             <Link to="/watchlist" className="text-white hover:text-red-600 transition">Watchlist</Link>
             
+            {/* ADD THIS - Ratings Link */}
+            <Link to="/ratings" className="flex items-center space-x-1 text-white hover:text-red-600 transition">
+              <Star className="w-4 h-4" />
+              <span>My Ratings</span>
+            </Link>
+            
             <Link to="/ai-suggestions" className="flex items-center space-x-1 text-white hover:text-red-600 transition">
               <Sparkles className="w-4 h-4" />
               <span>AI Suggestions</span>
@@ -157,6 +162,12 @@ const Navbar = () => {
             
             <Link to="/watchlist" className="text-white hover:text-red-600" onClick={() => setIsOpen(false)}>
               Watchlist
+            </Link>
+            
+            {/* ADD THIS - Mobile Ratings Link */}
+            <Link to="/ratings" className="flex items-center text-white hover:text-red-600" onClick={() => setIsOpen(false)}>
+              <Star className="w-4 h-4 mr-2" />
+              My Ratings
             </Link>
             
             <Link to="/ai-suggestions" className="text-white hover:text-red-600" onClick={() => setIsOpen(false)}>

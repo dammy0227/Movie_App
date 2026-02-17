@@ -1,7 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { registerUser, loginUser } from "../../services/authService";
+import { registerUser, loginUser, googleAuth } from "../../services/authService"; 
 
-// Thunks
 export const register = createAsyncThunk(
   "auth/register",
   async (userData, thunkAPI) => {
@@ -24,7 +23,17 @@ export const login = createAsyncThunk(
   }
 );
 
-// ✅ Restore from localStorage
+export const googleLogin = createAsyncThunk(
+  "auth/googleLogin",
+  async (idToken, thunkAPI) => {
+    try {
+      return await googleAuth(idToken);
+    } catch (error) {
+      return thunkAPI.rejectWithValue(error.response?.data?.message || "Google login failed");
+    }
+  }
+);
+
 const initialState = {
   user: JSON.parse(localStorage.getItem("user")) || null,
   token: localStorage.getItem("token") || null,
@@ -39,14 +48,13 @@ const authSlice = createSlice({
     logout: (state) => {
       state.user = null;
       state.token = null;
-
       localStorage.removeItem("token");
       localStorage.removeItem("user");
     },
   },
   extraReducers: (builder) => {
     builder
-      // Register
+      
       .addCase(register.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -55,19 +63,15 @@ const authSlice = createSlice({
         state.loading = false;
         state.user = action.payload.user;
         state.token = action.payload.token;
-
         localStorage.setItem("token", action.payload.token);
-        localStorage.setItem(
-          "user",
-          JSON.stringify(action.payload.user)
-        );
+        localStorage.setItem("user", JSON.stringify(action.payload.user));
       })
       .addCase(register.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
 
-      // Login
+    
       .addCase(login.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -76,14 +80,27 @@ const authSlice = createSlice({
         state.loading = false;
         state.user = action.payload.user;
         state.token = action.payload.token;
-
         localStorage.setItem("token", action.payload.token);
-        localStorage.setItem(
-          "user",
-          JSON.stringify(action.payload.user)
-        );
+        localStorage.setItem("user", JSON.stringify(action.payload.user));
       })
       .addCase(login.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
+   
+      .addCase(googleLogin.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(googleLogin.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload.user;
+        state.token = action.payload.token;
+        localStorage.setItem("token", action.payload.token);
+        localStorage.setItem("user", JSON.stringify(action.payload.user));
+      })
+      .addCase(googleLogin.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });

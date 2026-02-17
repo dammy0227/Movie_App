@@ -9,7 +9,7 @@ const HeroBanner = ({ items = [] }) => {
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const intervalRef = useRef(null);
 
-  // Clear and reset interval function
+ 
   const resetInterval = useCallback(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);

@@ -37,6 +37,23 @@ const watchlistSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    
+    userRating: {
+      type: Number,
+      min: 0,
+      max: 10,
+      default: null
+    },
+   
+    ratedAt: {
+      type: Date
+    },
+  
+    review: {
+      type: String,
+      maxlength: 500,
+      default: null
+    }
   },
   { timestamps: true }
 );

@@ -12,8 +12,8 @@ import TVDetail from './pages/TVDetail';
 import PersonDetail from './pages/PersonDetail';
 import SearchResults from './pages/SearchResults';
 import AISuggestionsPage from './pages/AISuggestionsPage';
+import Ratings from './pages/Ratings'; 
 import { useAuth } from './hooks/useAuth';
-
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated } = useAuth();
@@ -106,6 +106,15 @@ function App() {
           element={
             <ProtectedRoute>
               <Watchlist />
+            </ProtectedRoute>
+          }
+        />
+       
+        <Route
+          path="/ratings"
+          element={
+            <ProtectedRoute>
+              <Ratings />
             </ProtectedRoute>
           }
         />

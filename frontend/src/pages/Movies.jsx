@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom'; 
 import Navbar from '../components/Navbar';
 import MovieRow from '../components/MovieRow';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -19,6 +19,7 @@ import { Search } from 'lucide-react';
 const Movies = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation(); 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('trending');
   
@@ -35,8 +36,19 @@ const Movies = () => {
     error = null 
   } = movieState;
 
+  // Read category from URL on component mount and when URL changes
   useEffect(() => {
-    // Fetch all categories
+    const params = new URLSearchParams(location.search);
+    const category = params.get('category');
+    if (category && ['trending', 'popular', 'topRated', 'nowPlaying', 'upcoming'].includes(category)) {
+      setActiveCategory(category);
+    } else {
+      setActiveCategory('trending');
+    }
+  }, [location.search]);
+
+  // Fetch all categories
+  useEffect(() => {
     dispatch(fetchTrending());
     dispatch(fetchPopular());
     dispatch(fetchTopRated());
@@ -44,21 +56,34 @@ const Movies = () => {
     dispatch(fetchUpcoming());
   }, [dispatch]);
 
+  // Handle search
   useEffect(() => {
     if (searchQuery.trim()) {
       const delayDebounce = setTimeout(() => {
         dispatch(fetchSearch(searchQuery));
         setActiveCategory('search');
+        // Update URL to reflect search
+        navigate(`/movies?search=${encodeURIComponent(searchQuery)}`, { replace: true });
       }, 500);
       return () => clearTimeout(delayDebounce);
     } else {
-      // Clear search results when search is empty
       dispatch(clearSearch());
+      // If search is cleared and no category in URL, set to trending
+      const params = new URLSearchParams(location.search);
+      if (!params.get('category')) {
+        navigate('/movies?category=trending', { replace: true });
+      }
     }
-  }, [searchQuery, dispatch]);
+  }, [searchQuery, dispatch, navigate, location.search]);
 
   const handleMovieClick = (movie) => {
     navigate(`/movie/${movie.id}`);
+  };
+
+  const handleCategoryChange = (categoryId) => {
+    setActiveCategory(categoryId);
+    setSearchQuery(''); // Clear search when changing category
+    navigate(`/movies?category=${categoryId}`);
   };
 
   const categories = [
@@ -126,7 +151,7 @@ const Movies = () => {
               {categories.map((category) => (
                 <button
                   key={category.id}
-                  onClick={() => setActiveCategory(category.id)}
+                  onClick={() => handleCategoryChange(category.id)}
                   className={`px-4 py-2 rounded-lg transition flex items-center ${
                     activeCategory === category.id
                       ? 'bg-red-600 text-white'
@@ -166,7 +191,7 @@ const Movies = () => {
                 <button
                   onClick={() => {
                     setSearchQuery('');
-                    setActiveCategory('trending');
+                    handleCategoryChange('trending');
                   }}
                   className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
                 >

@@ -1,52 +1,42 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchMovieDetails } from '../features/movie/movieSlice';
 import { fetchSummary } from '../features/ai/aiSlice';
 import { addWatchlist, addHistory } from '../features/user/userSlice';
+import { 
+  fetchItemRating, 
+  fetchAverageRating, 
+  rateMovie,
+  updateUserRating,
+  removeRating 
+} from '../features/rating/ratingSlice';
 import Navbar from '../components/Navbar';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
-import { Heart, Star, Clock, Calendar, Film, Play, Sparkles, X } from 'lucide-react';
+import RatingModal from '../components/RatingModal';
+import RatingDisplay from '../components/RatingDisplay';
+import { Heart, Star, Clock, Calendar, Film, Play, Sparkles, X, Volume2, VolumeX } from 'lucide-react'; 
 
 const MovieDetail = () => {
   const { id } = useParams();
   const dispatch = useDispatch();
   const [showAISummary, setShowAISummary] = useState(false);
-  
-  // State for trailer modal
-  const [showTrailer, setShowTrailer] = useState(false);
   const [trailerKey, setTrailerKey] = useState('');
-
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [isMuted, setIsMuted] = useState(true); 
+  const [showTrailerInHero, setShowTrailerInHero] = useState(false);
+  const iframeRef = useRef(null);
+  
   const { details, loading, error } = useSelector((state) => state.movie);
   const { summary, loading: aiLoading } = useSelector((state) => state.ai);
+  const { itemRatings, averageRatings } = useSelector((state) => state.rating);
 
   useEffect(() => {
     dispatch(fetchMovieDetails(id));
+    dispatch(fetchItemRating(id));
+    dispatch(fetchAverageRating(id));
   }, [dispatch, id]);
-
-  // Extract trailer key using useMemo instead of useEffect with setState
-  const extractedTrailerKey = useMemo(() => {
-    if (details?.videos?.results) {
-      // Find the first YouTube trailer
-      const trailer = details.videos.results.find(
-        video => video.type === 'Trailer' && video.site === 'YouTube'
-      );
-      // If no trailer, try to find a teaser
-      const teaser = !trailer ? details.videos.results.find(
-        video => video.type === 'Teaser' && video.site === 'YouTube'
-      ) : null;
-      
-      const video = trailer || teaser;
-      return video?.key || '';
-    }
-    return '';
-  }, [details]);
-
-  // Update trailerKey when extracted key changes
-  useEffect(() => {
-    setTrailerKey(extractedTrailerKey);
-  }, [extractedTrailerKey]);
 
   useEffect(() => {
     if (details?.id) {
@@ -58,13 +48,39 @@ const MovieDetail = () => {
     }
   }, [details, dispatch]);
 
+  // Extract trailer key
+  const extractedTrailerKey = useMemo(() => {
+    if (details?.videos?.results) {
+      const trailer = details.videos.results.find(
+        video => video.type === 'Trailer' && video.site === 'YouTube'
+      );
+      const teaser = !trailer ? details.videos.results.find(
+        video => video.type === 'Teaser' && video.site === 'YouTube'
+      ) : null;
+      
+      const video = trailer || teaser;
+      return video?.key || '';
+    }
+    return '';
+  }, [details]);
+
+
+  useEffect(() => {
+    if (extractedTrailerKey) {
+      setTrailerKey(extractedTrailerKey);
+      setShowTrailerInHero(true); 
+    }
+  }, [extractedTrailerKey]);
+
   const handleAddToWatchlist = useCallback(() => {
     dispatch(addWatchlist({
       tmdbId: details.id,
       omdbId: details.imdb_id,
       title: details.title,
       poster: details.poster_path,
-      voteAverage: details.vote_average
+      voteAverage: details.vote_average,
+      media_type: 'movie',
+      release_date: details.release_date
     }));
   }, [dispatch, details]);
 
@@ -75,15 +91,44 @@ const MovieDetail = () => {
     setShowAISummary(!showAISummary);
   }, [dispatch, details, showAISummary]);
 
-  const handleWatchTrailer = useCallback(() => {
-    if (trailerKey) {
-      setShowTrailer(true);
-    }
-  }, [trailerKey]);
+  const toggleMute = () => {
+    setIsMuted(!isMuted);
+  };
 
-  const handleCloseTrailer = useCallback(() => {
-    setShowTrailer(false);
-  }, []);
+  const handleRatingSubmit = async ({ rating, review }) => {
+    const currentRating = itemRatings[id];
+    
+    if (currentRating?.userRating) {
+      await dispatch(updateUserRating({ 
+        tmdbId: id, 
+        rating, 
+        review 
+      }));
+    } else {
+      await dispatch(rateMovie({
+        tmdbId: details.id,
+        title: details.title,
+        poster: details.poster_path,
+        rating,
+        review,
+        media_type: 'movie'
+      }));
+    }
+    
+    dispatch(fetchItemRating(id));
+    dispatch(fetchAverageRating(id));
+    setShowRatingModal(false);
+  };
+
+  const handleRemoveRating = async () => {
+    if (window.confirm('Remove your rating?')) {
+      await dispatch(removeRating(id));
+      dispatch(fetchItemRating(id));
+      dispatch(fetchAverageRating(id));
+    }
+  };
+
+  const currentRating = itemRatings[id];
 
   if (loading) {
     return (
@@ -108,17 +153,51 @@ const MovieDetail = () => {
     <div className="min-h-screen bg-black pb-7">
       <Navbar />
       
-      {/* Hero Section with Backdrop */}
-      <div className="relative h-[60vh] w-full">
-        <img
-          src={`https://image.tmdb.org/t/p/original${details.backdrop_path}`}
-          alt={details.title}
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-linear-to-t from-black via-black/50 to-transparent" />
+      {/* Hero Section with Trailer or Backdrop */}
+      <div className="relative h-[70vh] w-full overflow-hidden">
+        {/* Trailer if available */}
+        {showTrailerInHero && trailerKey ? (
+          <>
+            <iframe
+              ref={iframeRef}
+              src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1&mute=${isMuted ? 1 : 0}&controls=0&showinfo=0&rel=0&loop=1&playlist=${trailerKey}&modestbranding=1`}
+              className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[calc(100%+100px)] h-[calc(100%+100px)] pointer-events-none"
+              style={{ 
+                objectFit: 'cover',
+                pointerEvents: 'none'
+              }}
+              allow="autoplay; encrypted-media"
+              title={`${details.title} Trailer`}
+            />
+            {/* Gradient Overlay */}
+            <div className="absolute inset-0 bg-linear-to-t from-black via-black/50 to-transparent" />
+            
+            {/* Sound Toggle Button */}
+            <button
+              onClick={toggleMute}
+              className="absolute bottom-24 right-8 z-20 bg-black/50 p-3 rounded-full hover:bg-black/70 transition"
+            >
+              {isMuted ? (
+                <VolumeX className="w-6 h-6 text-white" />
+              ) : (
+                <Volume2 className="w-6 h-6 text-white" />
+              )}
+            </button>
+          </>
+        ) : (
+          /* Backdrop as fallback */
+          <>
+            <img
+              src={`https://image.tmdb.org/t/p/original${details.backdrop_path}`}
+              alt={details.title}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-linear-to-t from-black via-black/50 to-transparent" />
+          </>
+        )}
       </div>
 
-      {/* Movie Details */}
+      {/* Movie Details (rest of your component remains the same) */}
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-48">
         <div className="flex flex-col md:flex-row gap-8">
           {/* Poster */}
@@ -162,6 +241,27 @@ const MovieDetail = () => {
                   {genre.name}
                 </span>
               ))}
+            </div>
+
+            {/* Rating Display */}
+            <div className="mb-6">
+              <RatingDisplay
+                userRating={currentRating?.userRating}
+                averageRating={averageRatings[id]?.average}
+                totalRatings={averageRatings[id]?.total}
+                onRateClick={() => setShowRatingModal(true)}
+                isRated={!!currentRating?.userRating}
+              />
+              
+              {/* Remove rating button (if rated) */}
+              {currentRating?.userRating && (
+                <button
+                  onClick={handleRemoveRating}
+                  className="mt-2 text-sm text-gray-400 hover:text-red-600 transition"
+                >
+                  Remove my rating
+                </button>
+              )}
             </div>
 
             {/* Overview */}
@@ -215,19 +315,6 @@ const MovieDetail = () => {
                 <Sparkles className="w-5 h-5 mr-2" />
                 AI Summary
               </button>
-
-              <button
-                onClick={handleWatchTrailer}
-                disabled={!trailerKey}
-                className={`flex items-center px-6 py-3 rounded-lg transition ${
-                  trailerKey 
-                    ? 'bg-gray-800 hover:bg-gray-700' 
-                    : 'bg-gray-800/50 cursor-not-allowed'
-                }`}
-              >
-                <Play className="w-5 h-5 mr-2" />
-                {trailerKey ? 'Watch Trailer' : 'No Trailer Available'}
-              </button>
             </div>
 
             {/* AI Summary Display */}
@@ -244,41 +331,27 @@ const MovieDetail = () => {
                 )}
               </div>
             )}
+
+            {/* User's Review Display */}
+            {currentRating?.review && (
+              <div className="mt-4 p-4 bg-gray-800/50 rounded-lg">
+                <h3 className="text-sm font-semibold text-gray-400 mb-1">Your Review</h3>
+                <p className="text-white">"{currentRating.review}"</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Trailer Modal */}
-      {showTrailer && trailerKey && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95">
-          <div className="relative w-full max-w-6xl">
-            {/* Close button */}
-            <button
-              onClick={handleCloseTrailer}
-              className="absolute -top-12 right-0 text-white hover:text-red-600 transition flex items-center gap-2"
-            >
-              <span>Close</span>
-              <X className="w-6 h-6" />
-            </button>
-            
-            {/* Video container */}
-            <div className="relative pt-[56.25%] bg-black rounded-lg overflow-hidden">
-              <iframe
-                src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1&modestbranding=1&rel=0`}
-                className="absolute top-0 left-0 w-full h-full"
-                allowFullScreen
-                allow="autoplay; encrypted-media"
-                title={`${details.title} Trailer`}
-              />
-            </div>
-            
-            {/* Trailer info */}
-            <div className="mt-4 text-white">
-              <h3 className="text-xl font-semibold">{details.title} - Trailer</h3>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Rating Modal */}
+      <RatingModal
+        isOpen={showRatingModal}
+        onClose={() => setShowRatingModal(false)}
+        onSubmit={handleRatingSubmit}
+        itemTitle={details.title}
+        currentRating={currentRating?.userRating}
+        currentReview={currentRating?.review}
+      />
     </div>
   );
 };
