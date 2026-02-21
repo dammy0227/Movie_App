@@ -1,7 +1,11 @@
 import Watchlist from "../models/Watchlist.js";
 import History from "../models/History.js";
 
+<<<<<<< HEAD
 
+=======
+// Your existing functions
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
 export const addToWatchlist = async (req, res) => {
   try {
     const { tmdbId, omdbId, title, poster, voteAverage, release_date, media_type } = req.body;
@@ -62,6 +66,12 @@ export const addToHistory = async (req, res) => {
   }
 };
 
+<<<<<<< HEAD
+=======
+// ============= NEW RATING FUNCTIONS =============
+
+// Get user's rated items
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
 export const getUserRatedItems = async (req, res) => {
   try {
     const ratedItems = await Watchlist.find({
@@ -76,7 +86,11 @@ export const getUserRatedItems = async (req, res) => {
   }
 };
 
+<<<<<<< HEAD
 
+=======
+// Check if user has rated a specific item
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
 export const checkUserRating = async (req, res) => {
   try {
     const { tmdbId } = req.params;

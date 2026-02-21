@@ -1,7 +1,10 @@
 import { searchMovies, getMovieDetails, getTrendingMovies, getPopularMovies, getTopRatedMovies, getNowPlayingMovies, getUpcomingMovies } from "../utils/tmdbApi.js";
 import { getMovieRatings } from "../utils/omdbApi.js";
 import { getMovieSummary } from "../utils/cohereApi.js";
+<<<<<<< HEAD
 import { findMovieBoxId, getMovieBoxSources } from "../utils/movieboxApi.js"; 
+=======
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
 
 export const searchMovie = async (req, res) => {
   try {
@@ -16,6 +19,7 @@ export const searchMovie = async (req, res) => {
 export const movieDetails = async (req, res) => {
   try {
     const { tmdbId } = req.params;
+<<<<<<< HEAD
     const { omdbId, aiSummary, includeSources } = req.query;
 
    
@@ -31,12 +35,24 @@ export const movieDetails = async (req, res) => {
     }
 
    
+=======
+    const { omdbId, aiSummary } = req.query;
+
+    const tmdbData = await getMovieDetails(tmdbId);
+
+    let omdbData = {};
+    if (omdbId) {
+      omdbData = await getMovieRatings(omdbId);
+    }
+
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
     let aiSummaryText = "";
     if (aiSummary === "true") {
       const plot = tmdbData.overview || tmdbData.title;
       aiSummaryText = await getMovieSummary(plot);
     }
 
+<<<<<<< HEAD
     
     let movieboxSources = [];
     let movieboxInfo = null;
@@ -112,6 +128,10 @@ export const getMovieSources = async (req, res) => {
     
   } catch (error) {
     console.error('Get movie sources error:', error);
+=======
+    res.json({ ...tmdbData, omdb: omdbData, ai_summary: aiSummaryText });
+  } catch (error) {
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
     res.status(500).json({ message: error.message });
   }
 };

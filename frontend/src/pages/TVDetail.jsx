@@ -1,7 +1,10 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
+<<<<<<< HEAD
 import YouTube from 'react-youtube'; 
+=======
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
 import { fetchTVDetails } from '../features/tv/tvSlice';
 import { fetchSummary } from '../features/ai/aiSlice';
 import { addWatchlist } from '../features/user/userSlice';
@@ -12,15 +15,22 @@ import {
   updateUserRating,
   removeRating 
 } from '../features/rating/ratingSlice';
+<<<<<<< HEAD
 import { fetchTVEpisodeSources } from '../features/tv/tvSlice';
 import { playVideo } from '../features/moviebox/movieboxSlice';
 import { getStreamUrl, getDownloadUrl, formatFileSize } from '../services/movieboxService';
+=======
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
 import Navbar from '../components/Navbar';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import RatingModal from '../components/RatingModal';
 import RatingDisplay from '../components/RatingDisplay';
+<<<<<<< HEAD
 import { Heart, Star, Calendar, Film, Play, Sparkles, X, Volume2, VolumeX, Download, ChevronDown } from 'lucide-react';
+=======
+import { Heart, Star, Calendar, Film, Play, Sparkles, X, Volume2, VolumeX } from 'lucide-react';
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
 
 const TVDetail = () => {
   const { id } = useParams();
@@ -30,6 +40,7 @@ const TVDetail = () => {
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [showTrailerInHero, setShowTrailerInHero] = useState(false);
+<<<<<<< HEAD
   const [selectedSeason, setSelectedSeason] = useState(1);
   const [selectedEpisode, setSelectedEpisode] = useState(1);
   const [showSources, setShowSources] = useState(false);
@@ -41,6 +52,9 @@ const TVDetail = () => {
   const [trailerError, setTrailerError] = useState(false);
   const playerRef = useRef(null);
 
+=======
+  const iframeRef = useRef(null);
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
 
   const { details, loading, error } = useSelector((state) => state.tv || {});
   const { summary, loading: aiLoading } = useSelector((state) => state.ai || {});
@@ -52,6 +66,7 @@ const TVDetail = () => {
     dispatch(fetchAverageRating(id));
   }, [dispatch, id]);
 
+<<<<<<< HEAD
   // Fetch season details when season changes
   useEffect(() => {
     const fetchSeasonDetails = async () => {
@@ -92,6 +107,9 @@ const TVDetail = () => {
   }, [details?.id, selectedSeason]);
 
   // Extract trailer key - only if details exists
+=======
+  // Extract trailer key
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
   const extractedTrailerKey = useMemo(() => {
     if (details?.videos?.results) {
       const trailer = details.videos.results.find(
@@ -102,10 +120,15 @@ const TVDetail = () => {
     return '';
   }, [details]);
 
+<<<<<<< HEAD
+=======
+  // Auto-play trailer when page loads
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
   useEffect(() => {
     if (extractedTrailerKey) {
       setTrailerKey(extractedTrailerKey);
       setShowTrailerInHero(true);
+<<<<<<< HEAD
       setTrailerError(false);
     }
   }, [extractedTrailerKey]);
@@ -170,6 +193,12 @@ const TVDetail = () => {
 
   const handleAddToWatchlist = useCallback(() => {
     if (!details) return;
+=======
+    }
+  }, [extractedTrailerKey]);
+
+  const handleAddToWatchlist = useCallback(() => {
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
     dispatch(addWatchlist({
       tmdbId: details.id,
       title: details.name,
@@ -181,13 +210,17 @@ const TVDetail = () => {
   }, [dispatch, details]);
 
   const handleAISummary = useCallback(() => {
+<<<<<<< HEAD
     if (!details) return;
+=======
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
     if (!showAISummary) {
       dispatch(fetchSummary({ plot: details.overview }));
     }
     setShowAISummary(!showAISummary);
   }, [dispatch, details, showAISummary]);
 
+<<<<<<< HEAD
   const handleGetEpisodeSources = async () => {
     setShowSources(!showSources);
     if (!showSources) {
@@ -241,6 +274,13 @@ const TVDetail = () => {
 
   const handleRatingSubmit = async ({ rating, review }) => {
     if (!details) return;
+=======
+  const toggleMute = () => {
+    setIsMuted(!isMuted);
+  };
+
+  const handleRatingSubmit = async ({ rating, review }) => {
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
     const currentRating = itemRatings[id];
     
     if (currentRating?.userRating) {
@@ -275,6 +315,7 @@ const TVDetail = () => {
 
   const currentRating = itemRatings[id];
 
+<<<<<<< HEAD
   // Show loading state
   if (loading) {
     return (
@@ -298,6 +339,25 @@ const TVDetail = () => {
       </div>
     );
   }
+=======
+  if (loading) return (
+    <div className="min-h-screen bg-black">
+      <Navbar />
+      <div className="pt-24 flex justify-center">
+        <LoadingSpinner />
+      </div>
+    </div>
+  );
+  
+  if (error) return (
+    <div className="min-h-screen bg-black">
+      <Navbar />
+      <div className="pt-24 px-4">
+        <ErrorMessage message={error} />
+      </div>
+    </div>
+  );
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
 
   return (
     <div className="min-h-screen bg-black">
@@ -305,6 +365,7 @@ const TVDetail = () => {
       
       {/* Hero Section with Trailer or Backdrop */}
       <div className="relative h-[70vh] w-full overflow-hidden">
+<<<<<<< HEAD
         {showTrailerInHero && trailerKey && !trailerError ? (
           <>
             <div className="absolute inset-0">
@@ -326,6 +387,26 @@ const TVDetail = () => {
               onClick={toggleMute}
               className="absolute bottom-24 right-8 z-20 bg-black/50 p-3 rounded-full hover:bg-black/70 transition"
               aria-label={isMuted ? "Unmute" : "Mute"}
+=======
+        {showTrailerInHero && trailerKey ? (
+          <>
+            <iframe
+              ref={iframeRef}
+              src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1&mute=${isMuted ? 1 : 0}&controls=0&showinfo=0&rel=0&loop=1&playlist=${trailerKey}&modestbranding=1`}
+              className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[calc(100%+100px)] h-[calc(100%+100px)] pointer-events-none"
+              style={{ 
+                objectFit: 'cover',
+                pointerEvents: 'none'
+              }}
+              allow="autoplay; encrypted-media"
+              title={`${details.name} Trailer`}
+            />
+            <div className="absolute inset-0 bg-linear-to-t from-black via-black/50 to-transparent" />
+            
+            <button
+              onClick={toggleMute}
+              className="absolute bottom-24 right-8 z-20 bg-black/50 p-3 rounded-full hover:bg-black/70 transition"
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
             >
               {isMuted ? (
                 <VolumeX className="w-6 h-6 text-white" />
@@ -337,10 +418,14 @@ const TVDetail = () => {
         ) : (
           <>
             <img
+<<<<<<< HEAD
               src={details.backdrop_path 
                 ? `https://image.tmdb.org/t/p/original${details.backdrop_path}`
                 : 'https://via.placeholder.com/1920x1080?text=No+Backdrop'
               }
+=======
+              src={`https://image.tmdb.org/t/p/original${details.backdrop_path}`}
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
               alt={details.name}
               className="w-full h-full object-cover"
             />
@@ -349,15 +434,23 @@ const TVDetail = () => {
         )}
       </div>
 
+<<<<<<< HEAD
       {/* TV Show Details */}
+=======
+      {/* TV Show Details (rest remains the same) */}
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
       <div className="relative z-10 max-w-7xl mx-auto px-4 -mt-48 pb-16">
         <div className="flex flex-col md:flex-row gap-8">
           <div className="md:w-1/3 lg:w-1/4">
             <img
+<<<<<<< HEAD
               src={details.poster_path 
                 ? `https://image.tmdb.org/t/p/w500${details.poster_path}`
                 : 'https://via.placeholder.com/500x750?text=No+Poster'
               }
+=======
+              src={`https://image.tmdb.org/t/p/w500${details.poster_path}`}
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
               alt={details.name}
               className="w-full rounded-2xl shadow-2xl"
             />
@@ -366,20 +459,36 @@ const TVDetail = () => {
           <div className="md:w-2/3 text-white">
             <h1 className="text-4xl font-bold mb-2">{details.name}</h1>
             
+<<<<<<< HEAD
             <div className="flex flex-wrap items-center gap-4 mb-6">
               <div className="flex items-center">
                 <Star className="w-5 h-5 text-yellow-400 mr-1" />
                 <span>{details.vote_average?.toFixed(1) || 'N/A'}</span>
+=======
+            <div className="flex items-center gap-4 mb-6">
+              <div className="flex items-center">
+                <Star className="w-5 h-5 text-yellow-400 mr-1" />
+                <span>{details.vote_average?.toFixed(1)}</span>
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
               </div>
               <span>•</span>
               <div className="flex items-center">
                 <Calendar className="w-4 h-4 mr-1" />
+<<<<<<< HEAD
                 <span>{details.first_air_date?.slice(0, 4) || 'N/A'}</span>
               </div>
               <span>•</span>
               <span>{details.number_of_seasons || 0} Seasons</span>
               <span>•</span>
               <span>{details.number_of_episodes || 0} Episodes</span>
+=======
+                <span>{details.first_air_date?.slice(0, 4)}</span>
+              </div>
+              <span>•</span>
+              <span>{details.number_of_seasons} Seasons</span>
+              <span>•</span>
+              <span>{details.number_of_episodes} Episodes</span>
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
             </div>
 
             <div className="flex flex-wrap gap-2 mb-6">
@@ -409,9 +518,14 @@ const TVDetail = () => {
               )}
             </div>
 
+<<<<<<< HEAD
             <p className="text-gray-300 leading-relaxed mb-8">{details.overview || 'No overview available.'}</p>
 
             {/* Actions */}
+=======
+            <p className="text-gray-300 leading-relaxed mb-8">{details.overview}</p>
+
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
             <div className="flex flex-wrap gap-4">
               <button
                 onClick={handleAddToWatchlist}
@@ -428,6 +542,7 @@ const TVDetail = () => {
                 <Sparkles className="w-5 h-5 mr-2" />
                 AI Summary
               </button>
+<<<<<<< HEAD
 
               {/* Episode Selector Toggle */}
               <button
@@ -440,6 +555,10 @@ const TVDetail = () => {
             </div>
 
             {/* AI Summary Display */}
+=======
+            </div>
+
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
             {showAISummary && (
               <div className="mt-6 p-4 bg-purple-600/20 border border-purple-600 rounded-lg">
                 <h3 className="text-lg font-semibold text-purple-400 mb-2 flex items-center">
@@ -454,6 +573,7 @@ const TVDetail = () => {
               </div>
             )}
 
+<<<<<<< HEAD
             {/* Episode Selector */}
             {showEpisodeSelector && (
               <div className="mt-4 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
@@ -576,6 +696,8 @@ const TVDetail = () => {
             )}
 
             {/* User's Review Display */}
+=======
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
             {currentRating?.review && (
               <div className="mt-4 p-4 bg-gray-800/50 rounded-lg">
                 <h3 className="text-sm font-semibold text-gray-400 mb-1">Your Review</h3>

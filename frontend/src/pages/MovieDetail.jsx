@@ -1,7 +1,10 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
+<<<<<<< HEAD
 import YouTube from 'react-youtube';
+=======
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
 import { fetchMovieDetails } from '../features/movie/movieSlice';
 import { fetchSummary } from '../features/ai/aiSlice';
 import { addWatchlist, addHistory } from '../features/user/userSlice';
@@ -12,15 +15,22 @@ import {
   updateUserRating,
   removeRating 
 } from '../features/rating/ratingSlice';
+<<<<<<< HEAD
 import { fetchMovieSources } from '../features/movie/movieSlice';
 import { playVideo } from '../features/moviebox/movieboxSlice';
+=======
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
 import Navbar from '../components/Navbar';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import RatingModal from '../components/RatingModal';
 import RatingDisplay from '../components/RatingDisplay';
+<<<<<<< HEAD
 import { getStreamUrl, getDownloadUrl, formatFileSize } from '../services/movieboxService';
 import { Heart, Star, Clock, Calendar, Film, Play, Sparkles, X, Volume2, VolumeX, Download } from 'lucide-react'; 
+=======
+import { Heart, Star, Clock, Calendar, Film, Play, Sparkles, X, Volume2, VolumeX } from 'lucide-react'; 
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
 
 const MovieDetail = () => {
   const { id } = useParams();
@@ -30,11 +40,15 @@ const MovieDetail = () => {
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [isMuted, setIsMuted] = useState(true); 
   const [showTrailerInHero, setShowTrailerInHero] = useState(false);
+<<<<<<< HEAD
   const [showSources, setShowSources] = useState(false);
   const [sources, setSources] = useState([]);
   const [loadingSources, setLoadingSources] = useState(false);
   const [trailerError, setTrailerError] = useState(false);
   const playerRef = useRef(null);
+=======
+  const iframeRef = useRef(null);
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
   
   const { details, loading, error } = useSelector((state) => state.movie);
   const { summary, loading: aiLoading } = useSelector((state) => state.ai);
@@ -72,10 +86,15 @@ const MovieDetail = () => {
     return '';
   }, [details]);
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
   useEffect(() => {
     if (extractedTrailerKey) {
       setTrailerKey(extractedTrailerKey);
       setShowTrailerInHero(true); 
+<<<<<<< HEAD
       setTrailerError(false);
     }
   }, [extractedTrailerKey]);
@@ -124,6 +143,11 @@ const MovieDetail = () => {
     setTrailerError(true);
   };
 
+=======
+    }
+  }, [extractedTrailerKey]);
+
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
   const handleAddToWatchlist = useCallback(() => {
     dispatch(addWatchlist({
       tmdbId: details.id,
@@ -143,6 +167,7 @@ const MovieDetail = () => {
     setShowAISummary(!showAISummary);
   }, [dispatch, details, showAISummary]);
 
+<<<<<<< HEAD
   const handleGetSources = async () => {
     setShowSources(!showSources);
     if (!showSources && (!sources || sources.length === 0)) {
@@ -202,6 +227,10 @@ const MovieDetail = () => {
         status.textContent = `Found ${sources.length} sources`;
       }
     }, 2000);
+=======
+  const toggleMute = () => {
+    setIsMuted(!isMuted);
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
   };
 
   const handleRatingSubmit = async ({ rating, review }) => {
@@ -264,6 +293,7 @@ const MovieDetail = () => {
       
       {/* Hero Section with Trailer or Backdrop */}
       <div className="relative h-[70vh] w-full overflow-hidden">
+<<<<<<< HEAD
         {showTrailerInHero && trailerKey && !trailerError ? (
           <>
             <div className="absolute inset-0">
@@ -278,13 +308,33 @@ const MovieDetail = () => {
                 }}
               />
             </div>
+=======
+        {/* Trailer if available */}
+        {showTrailerInHero && trailerKey ? (
+          <>
+            <iframe
+              ref={iframeRef}
+              src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1&mute=${isMuted ? 1 : 0}&controls=0&showinfo=0&rel=0&loop=1&playlist=${trailerKey}&modestbranding=1`}
+              className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[calc(100%+100px)] h-[calc(100%+100px)] pointer-events-none"
+              style={{ 
+                objectFit: 'cover',
+                pointerEvents: 'none'
+              }}
+              allow="autoplay; encrypted-media"
+              title={`${details.title} Trailer`}
+            />
+            {/* Gradient Overlay */}
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
             <div className="absolute inset-0 bg-linear-to-t from-black via-black/50 to-transparent" />
             
             {/* Sound Toggle Button */}
             <button
               onClick={toggleMute}
               className="absolute bottom-24 right-8 z-20 bg-black/50 p-3 rounded-full hover:bg-black/70 transition"
+<<<<<<< HEAD
               aria-label={isMuted ? "Unmute" : "Mute"}
+=======
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
             >
               {isMuted ? (
                 <VolumeX className="w-6 h-6 text-white" />
@@ -294,6 +344,10 @@ const MovieDetail = () => {
             </button>
           </>
         ) : (
+<<<<<<< HEAD
+=======
+          /* Backdrop as fallback */
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
           <>
             <img
               src={`https://image.tmdb.org/t/p/original${details.backdrop_path}`}
@@ -305,7 +359,11 @@ const MovieDetail = () => {
         )}
       </div>
 
+<<<<<<< HEAD
       {/* Movie Details */}
+=======
+      {/* Movie Details (rest of your component remains the same) */}
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-48">
         <div className="flex flex-col md:flex-row gap-8">
           {/* Poster */}
@@ -361,6 +419,10 @@ const MovieDetail = () => {
                 isRated={!!currentRating?.userRating}
               />
               
+<<<<<<< HEAD
+=======
+              {/* Remove rating button (if rated) */}
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
               {currentRating?.userRating && (
                 <button
                   onClick={handleRemoveRating}
@@ -422,6 +484,7 @@ const MovieDetail = () => {
                 <Sparkles className="w-5 h-5 mr-2" />
                 AI Summary
               </button>
+<<<<<<< HEAD
 
               {/* Watch Now Button */}
               <button
@@ -431,6 +494,8 @@ const MovieDetail = () => {
                 <Play className="w-5 h-5 mr-2" />
                 {showSources ? 'Hide Sources' : 'Watch Now'}
               </button>
+=======
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
             </div>
 
             {/* AI Summary Display */}
@@ -448,6 +513,7 @@ const MovieDetail = () => {
               </div>
             )}
 
+<<<<<<< HEAD
             {/* Sources Display */}
             {showSources && (
               <div className="mt-6 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
@@ -496,6 +562,8 @@ const MovieDetail = () => {
               </div>
             )}
 
+=======
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
             {/* User's Review Display */}
             {currentRating?.review && (
               <div className="mt-4 p-4 bg-gray-800/50 rounded-lg">

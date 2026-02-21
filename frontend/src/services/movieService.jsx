@@ -1,6 +1,9 @@
 import API from "./api";
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
 export const getTrendingMovies = async () => {
   const res = await API.get("/movies/trending");
   return res.data;
@@ -26,12 +29,16 @@ export const getUpcomingMovies = async () => {
   return res.data;
 };
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
 export const searchMovies = async (query) => {
   const res = await API.get("/movies/search", { params: { query } });
   return res.data;
 };
 
+<<<<<<< HEAD
 
 export const getMovieDetails = async (tmdbId, includeSources = false) => {
   const res = await API.get(`/movies/details/${tmdbId}`, {
@@ -42,5 +49,9 @@ export const getMovieDetails = async (tmdbId, includeSources = false) => {
 
 export const getMovieSources = async (tmdbId) => {
   const res = await API.get(`/movies/sources/${tmdbId}`);
+=======
+export const getMovieDetails = async (tmdbId) => {
+  const res = await API.get(`/movies/details/${tmdbId}`);
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
   return res.data;
 };

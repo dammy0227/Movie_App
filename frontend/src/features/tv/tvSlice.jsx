@@ -6,8 +6,12 @@ import {
   getPopularTVShows,
   getTopRatedTVShows,
   getAiringTodayTVShows,
+<<<<<<< HEAD
   getOnTheAirTVShows,
   getTVEpisodeSources
+=======
+  getOnTheAirTVShows
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
 } from "../../services/tvService";
 
 // Thunks
@@ -21,8 +25,12 @@ export const fetchTVSearch = createAsyncThunk("tv/fetchTVSearch", async (query, 
 
 export const fetchTVDetails = createAsyncThunk("tv/fetchTVDetails", async (tvId, thunkAPI) => {
   try {
+<<<<<<< HEAD
     // Include sources by default
     return await getTVShowDetails(tvId, true);
+=======
+    return await getTVShowDetails(tvId);
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
   } catch (error) {
     return thunkAPI.rejectWithValue(error.response?.data || error.message);
   }
@@ -68,6 +76,7 @@ export const fetchOnTheAirTV = createAsyncThunk("tv/fetchOnTheAirTV", async (_, 
   }
 });
 
+<<<<<<< HEAD
 export const fetchTVEpisodeSources = createAsyncThunk(
   "tv/fetchTVEpisodeSources", 
   async ({ tvId, season, episode }, thunkAPI) => {
@@ -84,6 +93,12 @@ const initialState = {
   searchResults: [],
   details: null,
   episodeSources: null,
+=======
+// Initial State
+const initialState = {
+  searchResults: [],
+  details: {},
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
   trending: [],
   popular: [],
   topRated: [],
@@ -103,10 +118,13 @@ const tvSlice = createSlice({
     clearTVError: (state) => {
       state.error = null;
     },
+<<<<<<< HEAD
     clearTVDetails: (state) => {
       state.details = null;
       state.episodeSources = null;
     }
+=======
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
   },
   extraReducers: (builder) => {
     builder
@@ -122,6 +140,10 @@ const tvSlice = createSlice({
       .addCase(fetchTVSearch.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+<<<<<<< HEAD
+=======
+        state.searchResults = [];
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
       })
 
       // Details
@@ -131,11 +153,16 @@ const tvSlice = createSlice({
       })
       .addCase(fetchTVDetails.fulfilled, (state, action) => {
         state.loading = false;
+<<<<<<< HEAD
         state.details = action.payload || null;
+=======
+        state.details = action.payload || {};
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
       })
       .addCase(fetchTVDetails.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+<<<<<<< HEAD
       })
 
       // Episode Sources
@@ -150,6 +177,9 @@ const tvSlice = createSlice({
       .addCase(fetchTVEpisodeSources.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+=======
+        state.details = {};
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
       })
 
       // Trending
@@ -164,6 +194,10 @@ const tvSlice = createSlice({
       .addCase(fetchTrendingTV.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+<<<<<<< HEAD
+=======
+        state.trending = [];
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
       })
 
       // Popular
@@ -178,6 +212,10 @@ const tvSlice = createSlice({
       .addCase(fetchPopularTV.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+<<<<<<< HEAD
+=======
+        state.popular = [];
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
       })
 
       // Top Rated
@@ -192,6 +230,10 @@ const tvSlice = createSlice({
       .addCase(fetchTopRatedTV.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+<<<<<<< HEAD
+=======
+        state.topRated = [];
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
       })
 
       // Airing Today
@@ -206,6 +248,10 @@ const tvSlice = createSlice({
       .addCase(fetchAiringTodayTV.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+<<<<<<< HEAD
+=======
+        state.airingToday = [];
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
       })
 
       // On The Air
@@ -220,9 +266,17 @@ const tvSlice = createSlice({
       .addCase(fetchOnTheAirTV.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+<<<<<<< HEAD
+=======
+        state.onTheAir = [];
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
       });
   },
 });
 
+<<<<<<< HEAD
 export const { clearTVSearch, clearTVError, clearTVDetails } = tvSlice.actions;
+=======
+export const { clearTVSearch, clearTVError } = tvSlice.actions;
+>>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
 export default tvSlice.reducer;
