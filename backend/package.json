@@ -13,10 +13,9 @@
   "description": "",
   "dependencies": {
     "axios": "^1.13.5",
-<<<<<<< HEAD
+
     "axios-cookiejar-support": "^6.0.5",
-=======
->>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
+
     "bcryptjs": "^3.0.3",
     "cohere-ai": "^7.20.0",
     "cors": "^2.8.6",
@@ -24,12 +23,8 @@
     "express": "^5.2.1",
     "firebase-admin": "^13.6.1",
     "jsonwebtoken": "^9.0.3",
-<<<<<<< HEAD
     "mongoose": "^9.2.1",
     "tough-cookie": "^6.0.0"
-=======
-    "mongoose": "^9.2.1"
->>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
   },
   "devDependencies": {
     "nodemon": "^3.1.11"
