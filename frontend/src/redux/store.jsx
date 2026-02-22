@@ -8,10 +8,7 @@ import searchReducer from '../features/search/searchSlice';
 import userReducer from '../features/user/userSlice';
 import aiReducer from '../features/ai/aiSlice';
 import ratingReducer from '../features/rating/ratingSlice';
-<<<<<<< HEAD
 import movieboxReducer from '../features/moviebox/movieboxSlice';
-=======
->>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
 
 export const store = configureStore({
   reducer: {
@@ -24,9 +21,6 @@ export const store = configureStore({
     user: userReducer,
     ai: aiReducer,
     rating: ratingReducer,
-<<<<<<< HEAD
     moviebox: movieboxReducer,
-=======
->>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
   },
 });

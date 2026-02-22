@@ -22,6 +22,7 @@ const Movies = () => {
   const location = useLocation(); 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('trending');
+  const [isSearching, setIsSearching] = useState(false);
   
   // Safely access state with defaults
   const movieState = useSelector((state) => state.movie || {});
@@ -59,15 +60,23 @@ const Movies = () => {
   // Handle search
   useEffect(() => {
     if (searchQuery.trim()) {
-      const delayDebounce = setTimeout(() => {
-        dispatch(fetchSearch(searchQuery));
-        setActiveCategory('search');
-        // Update URL to reflect search
-        navigate(`/movies?search=${encodeURIComponent(searchQuery)}`, { replace: true });
+      setIsSearching(true);
+      const delayDebounce = setTimeout(async () => {
+        try {
+          await dispatch(fetchSearch(searchQuery));
+          setActiveCategory('search');
+          navigate(`/movies?search=${encodeURIComponent(searchQuery)}`, { replace: true });
+        } finally {
+          setIsSearching(false);
+        }
       }, 500);
-      return () => clearTimeout(delayDebounce);
+      return () => {
+        clearTimeout(delayDebounce);
+        setIsSearching(false);
+      };
     } else {
       dispatch(clearSearch());
+      setIsSearching(false);
       // If search is cleared and no category in URL, set to trending
       const params = new URLSearchParams(location.search);
       if (!params.get('category')) {
@@ -133,16 +142,23 @@ const Movies = () => {
             {getCategoryTitle()}
           </h1>
           
-          {/* Search Bar */}
+          {/* Search Bar with Loading Indicator */}
           <div className="relative max-w-md mb-6">
             <input
               type="text"
               placeholder="Search movies..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-4 py-3 pl-12 bg-gray-900 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
+              className="w-full px-4 py-3 pl-12 pr-12 bg-gray-900 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
             />
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            
+            {/* Search Loading Indicator */}
+            {isSearching && (
+              <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                <div className="w-5 h-5 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            )}
           </div>
 
           {/* Category Tabs */}
@@ -184,7 +200,7 @@ const Movies = () => {
             onMovieClick={handleMovieClick}
           />
         ) : (
-          !loading && (
+          !loading && !isSearching && (
             <div className="text-center py-16">
               <p className="text-gray-400 text-lg mb-4">No movies found</p>
               {searchQuery.trim() && (
@@ -200,6 +216,13 @@ const Movies = () => {
               )}
             </div>
           )
+        )}
+        
+        {/* Loading state when searching */}
+        {isSearching && (
+          <div className="flex justify-center py-12">
+            <LoadingSpinner />
+          </div>
         )}
       </div>
     </div>

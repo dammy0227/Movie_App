@@ -4,18 +4,19 @@ import { FcGoogle } from "react-icons/fc";
 import { googleLogin } from "../features/auth/authSlice";
 import { auth, googleProvider } from "../config/firebase";
 import { signInWithPopup } from "firebase/auth";
+import { useState } from "react";
+import LoadingSpinner from "./LoadingSpinner";
 
 const GoogleButton = ({ text = "Sign in with Google" }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
   const handleGoogleClick = async () => {
+    setLoading(true);
     try {
-
       const result = await signInWithPopup(auth, googleProvider);
-      
       const idToken = await result.user.getIdToken();
-      
       const response = await dispatch(googleLogin(idToken));
       
       if (response.meta.requestStatus === 'fulfilled') {
@@ -23,6 +24,11 @@ const GoogleButton = ({ text = "Sign in with Google" }) => {
       }
     } catch (error) {
       console.error("Google sign-in error:", error);
+      if (error.code === 'auth/popup-blocked') {
+        alert('Popup was blocked. Please allow popups for this site or try redirect sign-in.');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -30,10 +36,20 @@ const GoogleButton = ({ text = "Sign in with Google" }) => {
     <button
       onClick={handleGoogleClick}
       type="button"
-      className="w-full py-3 bg-white text-gray-900 font-semibold rounded hover:bg-gray-100 transition flex items-center justify-center gap-2 border border-gray-300"
+      disabled={loading}
+      className="w-full py-3 bg-white text-gray-900 font-semibold rounded hover:bg-gray-100 transition flex items-center justify-center gap-2 border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
     >
-      <FcGoogle className="text-2xl" />
-      {text}
+      {loading ? (
+        <>
+          <LoadingSpinner />
+          <span>Signing in...</span>
+        </>
+      ) : (
+        <>
+          <FcGoogle className="text-2xl" />
+          {text}
+        </>
+      )}
     </button>
   );
 };

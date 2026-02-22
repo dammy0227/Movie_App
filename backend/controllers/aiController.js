@@ -96,8 +96,5 @@ export const aiSummary = async (req, res) => {
     console.error('AI Summary Error:', error);
     res.status(500).json({ message: error.message });
   }
-<<<<<<< HEAD
 }; 
-=======
-};
->>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
+

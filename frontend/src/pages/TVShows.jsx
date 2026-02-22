@@ -21,6 +21,7 @@ const TVShows = () => {
   const location = useLocation(); 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('trending');
+  const [isSearching, setIsSearching] = useState(false);
   
   const tvState = useSelector((state) => state.tv || {});
   const { 
@@ -34,15 +35,25 @@ const TVShows = () => {
     error = null 
   } = tvState;
 
+  // Update active category based on URL
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const category = params.get('category');
-    if (category && ['trending', 'popular', 'topRated', 'airingToday', 'onTheAir'].includes(category)) {
+    const search = params.get('search');
+    
+    if (search) {
+      setSearchQuery(search);
+      setActiveCategory('search');
+    } else if (category && ['trending', 'popular', 'topRated', 'airingToday', 'onTheAir'].includes(category)) {
       setActiveCategory(category);
     } else {
       setActiveCategory('trending');
+      // Update URL if needed
+      if (!category && !search) {
+        navigate('/tv?category=trending', { replace: true });
+      }
     }
-  }, [location.search]);
+  }, [location.search, navigate]);
 
   // Fetch all categories
   useEffect(() => {
@@ -56,21 +67,22 @@ const TVShows = () => {
   // Handle search
   useEffect(() => {
     if (searchQuery.trim()) {
-      const timer = setTimeout(() => {
-        dispatch(fetchTVSearch(searchQuery));
-        setActiveCategory('search');
-        // Update URL to reflect search
-        navigate(`/tv?search=${encodeURIComponent(searchQuery)}`, { replace: true });
+      setIsSearching(true);
+      const timer = setTimeout(async () => {
+        try {
+          await dispatch(fetchTVSearch(searchQuery));
+          setActiveCategory('search');
+          navigate(`/tv?search=${encodeURIComponent(searchQuery)}`, { replace: true });
+        } finally {
+          setIsSearching(false);
+        }
       }, 500);
-      return () => clearTimeout(timer);
-    } else {
-      // If search is cleared and no category in URL, set to trending
-      const params = new URLSearchParams(location.search);
-      if (!params.get('category')) {
-        navigate('/tv?category=trending', { replace: true });
-      }
+      return () => {
+        clearTimeout(timer);
+        setIsSearching(false);
+      };
     }
-  }, [searchQuery, dispatch, navigate, location.search]);
+  }, [searchQuery, dispatch, navigate]);
 
   const handleTVShowClick = (show) => {
     navigate(`/tv/${show.id}`);
@@ -80,6 +92,11 @@ const TVShows = () => {
     setActiveCategory(categoryId);
     setSearchQuery(''); 
     navigate(`/tv?category=${categoryId}`);
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    handleCategoryChange('trending');
   };
 
   const categories = [
@@ -102,7 +119,7 @@ const TVShows = () => {
   };
 
   // Show loading spinner while loading and no data
-  if (loading && !trending.length && !popular.length && !searchResults.length) {
+  if (loading && !trending.length && !popular.length && !searchResults.length && !isSearching) {
     return (
       <div className="min-h-screen bg-black">
         <Navbar />
@@ -124,16 +141,23 @@ const TVShows = () => {
           </h1>
         </div>
 
-        {/* Search Bar */}
+        {/* Search Bar with Loading Indicator */}
         <div className="relative max-w-md mb-6">
           <input
             type="text"
             placeholder="Search TV shows..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-4 py-3 pl-12 bg-gray-900 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
+            className="w-full px-4 py-3 pl-12 pr-12 bg-gray-900 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
           />
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          
+          {/* Search Loading Indicator */}
+          {isSearching && (
+            <div className="absolute right-4 top-1/2 -translate-y-1/2">
+              <div className="w-5 h-5 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          )}
         </div>
 
         {/* Category Tabs */}
@@ -164,39 +188,45 @@ const TVShows = () => {
 
         {error && <ErrorMessage message={error} />}
 
-        {/* Show loading spinner inside if loading but we already have some data */}
-        {loading && displayShows.length === 0 ? (
+        {/* Loading state */}
+        {isSearching && (
           <div className="flex justify-center py-12">
             <LoadingSpinner />
           </div>
-        ) : displayShows.length > 0 ? (
-          <MovieRow
-            title=""
-            movies={displayShows.map(show => ({
-              id: show.id,
-              title: show.name,
-              poster_path: show.poster_path,
-              vote_average: show.vote_average,
-              release_date: show.first_air_date
-            }))}
-            onMovieClick={handleTVShowClick}
-          />
-        ) : (
-          !loading && (
-            <div className="text-center py-16">
-              <p className="text-gray-400 text-lg">No TV shows found</p>
-              {searchQuery.trim() && (
-                <button
-                  onClick={() => {
-                    setSearchQuery('');
-                    handleCategoryChange('trending');
-                  }}
-                  className="mt-4 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
-                >
-                  Clear Search
-                </button>
-              )}
+        )}
+
+        {/* Show content */}
+        {!isSearching && (
+          loading && displayShows.length === 0 ? (
+            <div className="flex justify-center py-12">
+              <LoadingSpinner />
             </div>
+          ) : displayShows.length > 0 ? (
+            <MovieRow
+              title=""
+              movies={displayShows.map(show => ({
+                id: show.id,
+                title: show.name,
+                poster_path: show.poster_path,
+                vote_average: show.vote_average,
+                release_date: show.first_air_date
+              }))}
+              onMovieClick={handleTVShowClick}
+            />
+          ) : (
+            !loading && (
+              <div className="text-center py-16">
+                <p className="text-gray-400 text-lg">No TV shows found</p>
+                {searchQuery.trim() && (
+                  <button
+                    onClick={handleClearSearch}
+                    className="mt-4 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+                  >
+                    Clear Search
+                  </button>
+                )}
+              </div>
+            )
           )
         )}
       </div>

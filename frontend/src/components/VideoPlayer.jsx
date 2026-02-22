@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { X, AlertCircle, Download, RefreshCw } from 'lucide-react';
 import { closePlayer, selectCurrentVideo, selectCurrentTitle, selectCurrentQuality } from '../features/moviebox/movieboxSlice';
@@ -9,75 +9,67 @@ const VideoPlayer = () => {
   const title = useSelector(selectCurrentTitle);
   const quality = useSelector(selectCurrentQuality);
   const videoRef = useRef(null);
+  const prevVideoUrlRef = useRef(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [useAlternative, setUseAlternative] = useState(false);
 
-  // Function to close player
-  const handleClosePlayer = () => {
+  const handleClosePlayer = useCallback(() => {
     dispatch(closePlayer());
     setError(null);
     setLoading(true);
     setUseAlternative(false);
-  };
+  }, [dispatch]);
 
-  // Listen for navigation events
   useEffect(() => {
-    // Create a function to handle route changes
-    const handleRouteChange = () => {
-      if (videoUrl) {
-        handleClosePlayer();
-      }
-    };
-
-    // Listen for click events on navigation links
     const handleNavClick = (e) => {
-      // Check if clicked element is a navigation link
       const target = e.target.closest('a');
       if (target && target.getAttribute('href') && !target.getAttribute('href').startsWith('#')) {
-        // Small delay to allow navigation to happen
         setTimeout(() => {
           handleClosePlayer();
         }, 50);
       }
     };
 
-    // Add event listener
     document.addEventListener('click', handleNavClick);
 
     return () => {
       document.removeEventListener('click', handleNavClick);
     };
-  }, [videoUrl]);
+  }, [handleClosePlayer]);
 
-  // Function to try alternative playback methods
-  const tryAlternativePlayback = () => {
+  const tryAlternativePlayback = useCallback(() => {
     setUseAlternative(true);
     setError(null);
     setLoading(false);
-  };
+  }, []);
 
-  // Function to open in new tab
-  const openInNewTab = () => {
+  const openInNewTab = useCallback(() => {
     window.open(videoUrl, '_blank');
-  };
+  }, [videoUrl]);
 
-  // Function to download
-  const downloadVideo = () => {
+  const downloadVideo = useCallback(() => {
     const link = document.createElement('a');
     link.href = videoUrl;
     link.download = `${title}_${quality}.mp4`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
+  }, [videoUrl, title, quality]);
 
   useEffect(() => {
-    setError(null);
-    setLoading(true);
-    setUseAlternative(false);
+    if (videoUrl !== prevVideoUrlRef.current) {
+      setError(null);
+      setLoading(true);
+      setUseAlternative(false);
+      prevVideoUrlRef.current = videoUrl;
+    }
+  }, [videoUrl]);
+
+  useEffect(() => {
+    if (!videoUrl || useAlternative) return;
     
-    if (videoUrl && videoRef.current && !useAlternative) {
+    if (videoRef.current) {
       console.log('Playing video URL:', videoUrl);
       
       const video = videoRef.current;
@@ -140,17 +132,13 @@ const VideoPlayer = () => {
     }
   }, [videoUrl, useAlternative]);
 
-  // If no video URL, don't render
   if (!videoUrl) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-      {/* Semi-transparent backdrop - only behind video */}
       <div className="absolute inset-0 bg-black/90 pointer-events-none" />
       
-      {/* Video container - only this area blocks clicks */}
       <div className="relative z-10 w-full h-full pointer-events-auto flex items-center justify-center">
-        {/* Close button - positioned absolutely within the container */}
         <button
           onClick={handleClosePlayer}
           className="absolute top-4 right-4 z-20 bg-black/50 p-2 rounded-full hover:bg-black/70 transition"
@@ -158,20 +146,17 @@ const VideoPlayer = () => {
           <X className="w-6 h-6 text-white" />
         </button>
 
-        {/* Video info */}
         <div className="absolute top-4 left-4 z-20 text-white bg-black/50 px-4 py-2 rounded-lg">
           <h2 className="text-xl font-bold">{title}</h2>
           <p className="text-sm text-gray-300">Quality: {quality}</p>
         </div>
 
-        {/* Loading indicator */}
         {loading && !error && !useAlternative && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
           </div>
         )}
 
-        {/* Alternative playback UI when direct video fails */}
         {useAlternative ? (
           <div className="bg-gray-900 rounded-lg p-8 max-w-md text-center border border-gray-700">
             <AlertCircle className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
@@ -236,7 +221,6 @@ const VideoPlayer = () => {
             </div>
           </div>
         ) : (
-          /* Video player */
           <video
             ref={videoRef}
             controls

@@ -8,10 +8,7 @@ import {
   getOnTheAirTVShows
 } from "../utils/tmdbApi.js";
 import { getMovieSummary } from "../utils/cohereApi.js";
-<<<<<<< HEAD
-import { findMovieBoxId, getMovieBoxSources } from "../utils/movieboxApi.js"; 
-=======
->>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
+import { findMovieBoxId, getMovieBoxSources } from "../utils/movieboxApi.js";
 
 export const searchTV = async (req, res) => {
   try {
@@ -26,41 +23,33 @@ export const searchTV = async (req, res) => {
 export const tvDetails = async (req, res) => {
   try {
     const { tvId } = req.params;
-<<<<<<< HEAD
     const { aiSummary, includeSources } = req.query;
 
-
+    // Get TMDB data
     const tmdbData = await getTVShowDetails(tvId);
 
- 
-=======
-    const { aiSummary } = req.query;
-
-    const tmdbData = await getTVShowDetails(tvId);
-
->>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
+    // Get AI summary if requested
     let aiSummaryText = "";
     if (aiSummary === "true") {
       const plot = tmdbData.overview || tmdbData.name;
       aiSummaryText = await getMovieSummary(plot);
     }
 
-<<<<<<< HEAD
-   
+    // Get MovieBox streaming sources if requested
     let movieboxSources = [];
     let movieboxInfo = null;
     
     if (includeSources === "true") {
       console.log(`Looking for MovieBox sources for TMDB TV ID: ${tvId}`);
       
-     
+      // Find matching MovieBox ID
       movieboxInfo = await findMovieBoxId(tmdbData);
       
       if (movieboxInfo) {
         console.log(`Found MovieBox match: ${movieboxInfo.title} (ID: ${movieboxInfo.id})`);
         
-        
-      
+        // For TV shows, we don't fetch sources here (need season/episode)
+        // Just return the MovieBox ID info
         movieboxInfo.hasSources = true;
       } else {
         console.log('No MovieBox match found');
@@ -83,7 +72,7 @@ export const tvDetails = async (req, res) => {
   }
 };
 
-
+// Get TV episode sources
 export const getTVEpisodeSources = async (req, res) => {
   try {
     const { tvId } = req.params;
@@ -93,21 +82,21 @@ export const getTVEpisodeSources = async (req, res) => {
       return res.status(400).json({ message: 'Season and episode are required' });
     }
     
- 
+    // Get TMDB data first
     const tmdbData = await getTVShowDetails(tvId);
     
     if (!tmdbData) {
       return res.status(404).json({ message: 'TV show not found' });
     }
     
-
+    // Find MovieBox ID
     const movieboxInfo = await findMovieBoxId(tmdbData);
     
     if (!movieboxInfo) {
       return res.status(404).json({ message: 'No streaming sources found for this show' });
     }
     
-    
+    // Get sources for specific episode
     const sources = await getMovieBoxSources(
       movieboxInfo.id,
       parseInt(season),
@@ -125,10 +114,6 @@ export const getTVEpisodeSources = async (req, res) => {
     
   } catch (error) {
     console.error('Get TV episode sources error:', error);
-=======
-    res.json({ ...tmdbData, ai_summary: aiSummaryText });
-  } catch (error) {
->>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
     res.status(500).json({ message: error.message });
   }
 };

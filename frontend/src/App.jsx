@@ -13,10 +13,7 @@ import PersonDetail from './pages/PersonDetail';
 import SearchResults from './pages/SearchResults';
 import AISuggestionsPage from './pages/AISuggestionsPage';
 import Ratings from './pages/Ratings'; 
-<<<<<<< HEAD
 import VideoPlayer from './components/VideoPlayer';
-=======
->>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
 import { useAuth } from './hooks/useAuth';
 
 const ProtectedRoute = ({ children }) => {
@@ -27,12 +24,9 @@ const ProtectedRoute = ({ children }) => {
 function App() {
   return (
     <Router>
-<<<<<<< HEAD
       {/* VideoPlayer will render here when a video is playing */}
       <VideoPlayer />
       
-=======
->>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />

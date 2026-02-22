@@ -13,8 +13,6 @@ import aiRoutes from "./routes/ai.js";
 import userRoutes from "./routes/user.js";
 import ratingRoutes from "./routes/ratingRoutes.js";
 import movieboxRoutes from "./routes/movieboxRoutes.js"; 
-import ratingRoutes from "./routes/ratingRoutes.js"; 
-
 
 dotenv.config();
 connectDB();
@@ -40,12 +38,8 @@ app.use("/api/collections", collectionRoutes);
 app.use("/api/search", searchRoutes);      
 app.use("/api/ai", aiRoutes);
 app.use("/api/user", userRoutes);
-
 app.use("/api/ratings", ratingRoutes);
 app.use("/api/moviebox", movieboxRoutes); 
-
-app.use("/api/ratings", ratingRoutes); 
-
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

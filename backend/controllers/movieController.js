@@ -1,10 +1,7 @@
 import { searchMovies, getMovieDetails, getTrendingMovies, getPopularMovies, getTopRatedMovies, getNowPlayingMovies, getUpcomingMovies } from "../utils/tmdbApi.js";
 import { getMovieRatings } from "../utils/omdbApi.js";
 import { getMovieSummary } from "../utils/cohereApi.js";
-<<<<<<< HEAD
-import { findMovieBoxId, getMovieBoxSources } from "../utils/movieboxApi.js"; 
-=======
->>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
+import { findMovieBoxId, getMovieBoxSources } from "../utils/movieboxApi.js";
 
 export const searchMovie = async (req, res) => {
   try {
@@ -19,13 +16,12 @@ export const searchMovie = async (req, res) => {
 export const movieDetails = async (req, res) => {
   try {
     const { tmdbId } = req.params;
-<<<<<<< HEAD
     const { omdbId, aiSummary, includeSources } = req.query;
 
-   
+    // Get TMDB data
     const tmdbData = await getMovieDetails(tmdbId);
 
-  
+    // Get OMDB ratings if requested
     let omdbData = {};
     if (omdbId || tmdbData.imdb_id) {
       const imdbId = omdbId || tmdbData.imdb_id;
@@ -34,39 +30,27 @@ export const movieDetails = async (req, res) => {
       }
     }
 
-   
-=======
-    const { omdbId, aiSummary } = req.query;
-
-    const tmdbData = await getMovieDetails(tmdbId);
-
-    let omdbData = {};
-    if (omdbId) {
-      omdbData = await getMovieRatings(omdbId);
-    }
-
->>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
+    // Get AI summary if requested
     let aiSummaryText = "";
     if (aiSummary === "true") {
       const plot = tmdbData.overview || tmdbData.title;
       aiSummaryText = await getMovieSummary(plot);
     }
 
-<<<<<<< HEAD
-    
+    // Get MovieBox streaming sources if requested
     let movieboxSources = [];
     let movieboxInfo = null;
     
     if (includeSources === "true") {
       console.log(`Looking for MovieBox sources for TMDB ID: ${tmdbId}`);
       
-    
+      // Find matching MovieBox ID
       movieboxInfo = await findMovieBoxId(tmdbData);
       
       if (movieboxInfo) {
         console.log(`Found MovieBox match: ${movieboxInfo.title} (ID: ${movieboxInfo.id})`);
         
-        
+        // Get streaming sources
         movieboxSources = await getMovieBoxSources(movieboxInfo.id);
         console.log(`Found ${movieboxSources.length} sources`);
       } else {
@@ -74,7 +58,7 @@ export const movieDetails = async (req, res) => {
       }
     }
 
- 
+    // Combine all data
     res.json({ 
       ...tmdbData, 
       omdb: omdbData, 
@@ -93,26 +77,27 @@ export const movieDetails = async (req, res) => {
   }
 };
 
-
+// Direct endpoint to get MovieBox sources for a TMDB movie
 export const getMovieSources = async (req, res) => {
   try {
     const { tmdbId } = req.params;
     const { season, episode } = req.query;
     
-
+    // Get TMDB data first to help with matching
     const tmdbData = await getMovieDetails(tmdbId);
     
     if (!tmdbData) {
       return res.status(404).json({ message: 'Movie not found' });
     }
     
+    // Find MovieBox ID
     const movieboxInfo = await findMovieBoxId(tmdbData);
     
     if (!movieboxInfo) {
       return res.status(404).json({ message: 'No streaming sources found for this movie' });
     }
     
-   
+    // Get sources
     const sources = await getMovieBoxSources(
       movieboxInfo.id, 
       season ? parseInt(season) : 0,
@@ -128,10 +113,6 @@ export const getMovieSources = async (req, res) => {
     
   } catch (error) {
     console.error('Get movie sources error:', error);
-=======
-    res.json({ ...tmdbData, omdb: omdbData, ai_summary: aiSummaryText });
-  } catch (error) {
->>>>>>> 9f79863cc8a29cab049d0bdaa7f586b2f5c9eb5f
     res.status(500).json({ message: error.message });
   }
 };
