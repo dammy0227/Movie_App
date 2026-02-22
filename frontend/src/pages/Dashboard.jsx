@@ -16,7 +16,7 @@ import {
 } from '../features/movie/movieSlice';
 import {
   fetchTrendingTV,
-  fetchPopularTV,
+  fetchPopularTV, 
   fetchTopRatedTV,
   fetchAiringTodayTV,
   fetchOnTheAirTV
