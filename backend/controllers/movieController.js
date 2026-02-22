@@ -1,8 +1,121 @@
+// controllers/movieController.js
 import { searchMovies, getMovieDetails, getTrendingMovies, getPopularMovies, getTopRatedMovies, getNowPlayingMovies, getUpcomingMovies } from "../utils/tmdbApi.js";
 import { getMovieRatings } from "../utils/omdbApi.js";
 import { getMovieSummary } from "../utils/cohereApi.js";
 import { findMovieBoxId, getMovieBoxSources } from "../utils/movieboxApi.js";
 
+// FAST endpoint - only TMDB data
+export const movieDetails = async (req, res) => {
+  try {
+    const { tmdbId } = req.params;
+    
+    // Get TMDB data only - FAST!
+    const tmdbData = await getMovieDetails(tmdbId);
+    
+    // Return just TMDB data immediately
+    res.json(tmdbData);
+    
+  } catch (error) {
+    console.error('Movie details error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// OMDB ratings endpoint (call separately)
+export const movieOmdbRatings = async (req, res) => {
+  try {
+    const { imdbId } = req.params;
+    
+    if (!imdbId) {
+      return res.json({});
+    }
+    
+    const omdbData = await getMovieRatings(imdbId);
+    res.json(omdbData);
+    
+  } catch (error) {
+    console.error('OMDB ratings error:', error);
+    res.json({});
+  }
+};
+
+// AI Summary endpoint (call when user clicks)
+export const movieAISummary = async (req, res) => {
+  try {
+    const { plot } = req.body;
+    
+    if (!plot) {
+      return res.json({ summary: '' });
+    }
+    
+    const summary = await getMovieSummary(plot);
+    res.json({ summary });
+    
+  } catch (error) {
+    console.error('AI summary error:', error);
+    res.json({ summary: 'Summary unavailable' });
+  }
+};
+
+// Optimized MovieBox sources endpoint (with timeout)
+export const getMovieSources = async (req, res) => {
+  try {
+    const { tmdbId } = req.params;
+    const { season, episode } = req.query;
+    
+    // Set timeout for the entire request
+    const timeout = setTimeout(() => {
+      if (!res.headersSent) {
+        res.status(200).json({ sources: [] });
+      }
+    }, 8000);
+    
+    // Get TMDB data first
+    const tmdbData = await getMovieDetails(tmdbId);
+    
+    if (!tmdbData) {
+      clearTimeout(timeout);
+      return res.status(200).json({ sources: [] });
+    }
+    
+    // Find MovieBox ID - with its own timeout
+    const movieboxInfo = await Promise.race([
+      findMovieBoxId(tmdbData),
+      new Promise(resolve => setTimeout(() => resolve(null), 5000))
+    ]);
+    
+    if (!movieboxInfo) {
+      clearTimeout(timeout);
+      return res.status(200).json({ sources: [] });
+    }
+    
+    // Get sources - with timeout
+    const sources = await Promise.race([
+      getMovieBoxSources(
+        movieboxInfo.id, 
+        season ? parseInt(season) : 0,
+        episode ? parseInt(episode) : 0
+      ),
+      new Promise(resolve => setTimeout(() => resolve([]), 5000))
+    ]);
+    
+    clearTimeout(timeout);
+    
+    res.json({
+      tmdbId,
+      movieboxId: movieboxInfo.id,
+      title: movieboxInfo.title,
+      sources: sources || []
+    });
+    
+  } catch (error) {
+    console.error('Get movie sources error:', error);
+    // Always return 200 with empty sources to not break UI
+    res.status(200).json({ sources: [] });
+  }
+};
+
+// Search movies
 export const searchMovie = async (req, res) => {
   try {
     const { query } = req.query;
@@ -13,110 +126,7 @@ export const searchMovie = async (req, res) => {
   }
 };
 
-export const movieDetails = async (req, res) => {
-  try {
-    const { tmdbId } = req.params;
-    const { omdbId, aiSummary, includeSources } = req.query;
-
-    // Get TMDB data
-    const tmdbData = await getMovieDetails(tmdbId);
-
-    // Get OMDB ratings if requested
-    let omdbData = {};
-    if (omdbId || tmdbData.imdb_id) {
-      const imdbId = omdbId || tmdbData.imdb_id;
-      if (imdbId) {
-        omdbData = await getMovieRatings(imdbId);
-      }
-    }
-
-    // Get AI summary if requested
-    let aiSummaryText = "";
-    if (aiSummary === "true") {
-      const plot = tmdbData.overview || tmdbData.title;
-      aiSummaryText = await getMovieSummary(plot);
-    }
-
-    // Get MovieBox streaming sources if requested
-    let movieboxSources = [];
-    let movieboxInfo = null;
-    
-    if (includeSources === "true") {
-      console.log(`Looking for MovieBox sources for TMDB ID: ${tmdbId}`);
-      
-      // Find matching MovieBox ID
-      movieboxInfo = await findMovieBoxId(tmdbData);
-      
-      if (movieboxInfo) {
-        console.log(`Found MovieBox match: ${movieboxInfo.title} (ID: ${movieboxInfo.id})`);
-        
-        // Get streaming sources
-        movieboxSources = await getMovieBoxSources(movieboxInfo.id);
-        console.log(`Found ${movieboxSources.length} sources`);
-      } else {
-        console.log('No MovieBox match found');
-      }
-    }
-
-    // Combine all data
-    res.json({ 
-      ...tmdbData, 
-      omdb: omdbData, 
-      ai_summary: aiSummaryText,
-      moviebox: movieboxInfo ? {
-        id: movieboxInfo.id,
-        title: movieboxInfo.title,
-        type: movieboxInfo.type,
-        sources: movieboxSources
-      } : null
-    });
-    
-  } catch (error) {
-    console.error('Movie details error:', error);
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// Direct endpoint to get MovieBox sources for a TMDB movie
-export const getMovieSources = async (req, res) => {
-  try {
-    const { tmdbId } = req.params;
-    const { season, episode } = req.query;
-    
-    // Get TMDB data first to help with matching
-    const tmdbData = await getMovieDetails(tmdbId);
-    
-    if (!tmdbData) {
-      return res.status(404).json({ message: 'Movie not found' });
-    }
-    
-    // Find MovieBox ID
-    const movieboxInfo = await findMovieBoxId(tmdbData);
-    
-    if (!movieboxInfo) {
-      return res.status(404).json({ message: 'No streaming sources found for this movie' });
-    }
-    
-    // Get sources
-    const sources = await getMovieBoxSources(
-      movieboxInfo.id, 
-      season ? parseInt(season) : 0,
-      episode ? parseInt(episode) : 0
-    );
-    
-    res.json({
-      tmdbId,
-      movieboxId: movieboxInfo.id,
-      title: movieboxInfo.title,
-      sources: sources
-    });
-    
-  } catch (error) {
-    console.error('Get movie sources error:', error);
-    res.status(500).json({ message: error.message });
-  }
-};
-
+// Trending movies
 export const trendingMovies = async (req, res) => {
   try {
     const movies = await getTrendingMovies();
@@ -126,6 +136,7 @@ export const trendingMovies = async (req, res) => {
   }
 };
 
+// Popular movies
 export const popularMovies = async (req, res) => {
   try {
     const movies = await getPopularMovies();
@@ -135,6 +146,7 @@ export const popularMovies = async (req, res) => {
   }
 };
 
+// Top rated movies
 export const topRatedMovies = async (req, res) => {
   try {
     const movies = await getTopRatedMovies();
@@ -144,6 +156,7 @@ export const topRatedMovies = async (req, res) => {
   }
 };
 
+// Now playing movies
 export const nowPlayingMovies = async (req, res) => {
   try {
     const movies = await getNowPlayingMovies();
@@ -153,6 +166,7 @@ export const nowPlayingMovies = async (req, res) => {
   }
 };
 
+// Upcoming movies
 export const upcomingMovies = async (req, res) => {
   try {
     const movies = await getUpcomingMovies();

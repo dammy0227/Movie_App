@@ -1,10 +1,10 @@
-// MovieDetail.jsx - Optimized with priority loading
+// MovieDetail.jsx - Fully optimized
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import YouTube from 'react-youtube';
-import { fetchMovieDetails } from '../features/movie/movieSlice';
+import { fetchMovieDetails, fetchOmdbRatings, fetchAISummary } from '../features/movie/movieSlice';
 import { fetchSummary } from '../features/ai/aiSlice';
 import { addWatchlist, addHistory } from '../features/user/userSlice';
 import { 
@@ -45,7 +45,7 @@ const MovieDetail = () => {
   const playerRef = useRef(null);
   
   // Redux state
-  const { details, loading, error } = useSelector((state) => state.movie);
+  const { details, loading, error, omdbRatings } = useSelector((state) => state.movie);
   const { summary, loading: aiLoading } = useSelector((state) => state.ai);
   const { itemRatings, averageRatings } = useSelector((state) => state.rating);
 
@@ -53,12 +53,13 @@ const MovieDetail = () => {
   useEffect(() => {
     const loadCriticalData = async () => {
       try {
-        // Only fetch movie details first - most important
-        await dispatch(fetchMovieDetails(id)).unwrap();
-        setShowPage(true); // Show page immediately after details load
+        // Only fetch movie details first - FAST now!
+        const result = await dispatch(fetchMovieDetails(id)).unwrap();
+        setShowPage(true); // Show page immediately
         
         // Then load secondary data in background
-        loadSecondaryData();
+        loadSecondaryData(result);
+        
       } catch (error) {
         console.error('Failed to load movie:', error);
         setShowPage(true); // Still show page even if error
@@ -69,28 +70,33 @@ const MovieDetail = () => {
   }, [dispatch, id]);
 
   // ============= PRIORITY 2: Load secondary data in background =============
-  const loadSecondaryData = useCallback(async () => {
-    // Load ratings in background (don't await)
+  const loadSecondaryData = useCallback(async (movieData) => {
+    // Load ratings in background
     Promise.all([
       dispatch(fetchItemRating(id)),
       dispatch(fetchAverageRating(id))
     ]).catch(err => console.log('Rating load failed:', err));
 
     // Add to history in background
-    if (details?.id) {
+    if (movieData?.id) {
       dispatch(addHistory({
-        tmdbId: details.id,
-        title: details.title,
-        poster: details.poster_path
+        tmdbId: movieData.id,
+        title: movieData.title,
+        poster: movieData.poster_path
       })).catch(err => console.log('History add failed:', err));
     }
-  }, [dispatch, id, details]);
 
-  // ============= PRIORITY 3: Load cast and images lazily =============
+    // Load OMDB ratings if IMDB ID exists
+    if (movieData?.imdb_id) {
+      dispatch(fetchOmdbRatings(movieData.imdb_id))
+        .catch(err => console.log('OMDB ratings load failed:', err));
+    }
+  }, [dispatch, id]);
+
+  // ============= PRIORITY 3: Load cast lazily =============
   useEffect(() => {
     if (!showPage) return;
     
-    // Use Intersection Observer to load cast when visible
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
@@ -109,7 +115,7 @@ const MovieDetail = () => {
     return () => observer.disconnect();
   }, [showPage]);
 
-  // ============= Extract trailer key (runs after details load) =============
+  // ============= Extract trailer key =============
   useEffect(() => {
     if (details?.videos?.results) {
       const trailer = details.videos.results.find(
@@ -134,14 +140,8 @@ const MovieDetail = () => {
     if (!showSources && (!sources || sources.length === 0)) {
       setLoadingSources(true);
       
-      // Single attempt with timeout - don't retry multiple times
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-        
         const result = await dispatch(fetchMovieSources(id)).unwrap();
-        clearTimeout(timeoutId);
-        
         if (result?.sources) {
           setSources(result.sources);
         } else {
@@ -155,6 +155,14 @@ const MovieDetail = () => {
       }
     }
   };
+
+  // ============= OPTIMIZED: Load AI summary only when user clicks =============
+  const handleAISummary = useCallback(() => {
+    if (!showAISummary && details?.overview) {
+      dispatch(fetchAISummary(details.overview));
+    }
+    setShowAISummary(!showAISummary);
+  }, [dispatch, details, showAISummary]);
 
   // ============= Mobile detection =============
   useEffect(() => {
@@ -221,13 +229,6 @@ const MovieDetail = () => {
     }));
   }, [dispatch, details]);
 
-  const handleAISummary = useCallback(() => {
-    if (!showAISummary && details?.overview) {
-      dispatch(fetchSummary({ plot: details.overview }));
-    }
-    setShowAISummary(!showAISummary);
-  }, [dispatch, details, showAISummary]);
-
   const handlePlayVideo = (source) => {
     const streamUrl = getStreamUrl(source.url);
     dispatch(playVideo({
@@ -255,7 +256,6 @@ const MovieDetail = () => {
   };
 
   const handleRatingSubmit = async ({ rating, review }) => {
-    // Keep your existing rating logic
     console.log('Rating submitted:', rating, review);
     setShowRatingModal(false);
   };
@@ -268,14 +268,13 @@ const MovieDetail = () => {
 
   const currentRating = itemRatings?.[id];
 
-  // Show skeleton loader immediately while loading critical data
+  // Show skeleton loader immediately
   if (!showPage || (loading && !details)) {
     return (
       <div className="min-h-screen bg-black">
         <Navbar />
         <div className="pt-24 px-4 max-w-7xl mx-auto">
           <div className="animate-pulse">
-            {/* Skeleton loader */}
             <div className="h-[50vh] md:h-[70vh] bg-gray-800 rounded-lg mb-8"></div>
             <div className="flex flex-col md:flex-row gap-8">
               <div className="md:w-1/3 lg:w-1/4">
@@ -343,7 +342,7 @@ const MovieDetail = () => {
               src={`https://image.tmdb.org/t/p/original${details.backdrop_path}`}
               alt={details.title}
               className="w-full h-full object-cover"
-              loading="eager" // Load backdrop immediately
+              loading="eager"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
           </>
@@ -353,7 +352,7 @@ const MovieDetail = () => {
       {/* Movie Details */}
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-24 md:-mt-48">
         <div className="flex flex-col md:flex-row gap-8">
-          {/* Poster - Load immediately */}
+          {/* Poster */}
           <div className="md:w-1/3 lg:w-1/4">
             <img
               src={`https://image.tmdb.org/t/p/w500${details.poster_path}`}
@@ -363,7 +362,7 @@ const MovieDetail = () => {
             />
           </div>
 
-          {/* Info - Load immediately */}
+          {/* Info */}
           <div className="md:w-2/3 lg:w-3/4 text-white">
             <h1 className="text-3xl md:text-5xl font-bold mb-2">{details.title}</h1>
             
@@ -394,7 +393,7 @@ const MovieDetail = () => {
               ))}
             </div>
 
-            {/* Rating Display - Show skeleton if not loaded yet */}
+            {/* Rating Display - Shows skeleton until ratings load */}
             {itemRatings ? (
               <div className="mb-6">
                 <RatingDisplay
@@ -417,7 +416,7 @@ const MovieDetail = () => {
               </p>
             </div>
 
-            {/* Cast - Load lazily when scrolled into view */}
+            {/* Cast - Load lazily */}
             <div id="cast-section">
               {castLoaded && details.credits?.cast?.length > 0 && (
                 <div className="mb-8">
@@ -448,6 +447,30 @@ const MovieDetail = () => {
               )}
             </div>
 
+            {/* OMDB Ratings - Show if available */}
+            {omdbRatings && Object.keys(omdbRatings).length > 0 && (
+              <div className="mb-4 p-3 bg-gray-800/50 rounded-lg">
+                <h3 className="text-sm font-semibold text-gray-400 mb-2">Additional Ratings</h3>
+                <div className="flex flex-wrap gap-3">
+                  {omdbRatings.imdbRating && (
+                    <div className="text-xs">
+                      <span className="text-yellow-400">IMDb:</span> {omdbRatings.imdbRating}
+                    </div>
+                  )}
+                  {omdbRatings.metascore && (
+                    <div className="text-xs">
+                      <span className="text-green-400">Metacritic:</span> {omdbRatings.metascore}
+                    </div>
+                  )}
+                  {omdbRatings.rottenTomatoes && (
+                    <div className="text-xs">
+                      <span className="text-red-400">Rotten Tomatoes:</span> {omdbRatings.rottenTomatoes}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-4">
               <button
@@ -463,7 +486,7 @@ const MovieDetail = () => {
                 className="flex items-center justify-center px-6 py-3 bg-purple-600 rounded-lg hover:bg-purple-700 transition"
               >
                 <Sparkles className="w-5 h-5 mr-2" />
-                AI Summary
+                {showAISummary ? 'Hide AI Summary' : 'AI Summary'}
               </button>
 
               <button

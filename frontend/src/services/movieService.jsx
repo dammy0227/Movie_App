@@ -1,3 +1,4 @@
+// services/movieService.js
 import API from "./api";
 
 export const getTrendingMovies = async () => {
@@ -30,15 +31,35 @@ export const searchMovies = async (query) => {
   return res.data;
 };
 
-export const getMovieDetails = async (tmdbId, includeSources = false) => {
-  const res = await API.get(`/movies/details/${tmdbId}`, {
-    params: { includeSources }
-  });
+// FAST - only TMDB details (no sources, no OMDB, no AI)
+export const getMovieDetails = async (tmdbId) => {
+  const res = await API.get(`/movies/details/${tmdbId}`);
   return res.data;
 };
 
-// Add this function - it was missing
-export const getMovieSources = async (tmdbId) => {
-  const res = await API.get(`/movies/sources/${tmdbId}`);
+// Separate function for OMDB ratings
+export const getMovieOmdbRatings = async (imdbId) => {
+  if (!imdbId) return {};
+  const res = await API.get(`/movies/omdb/${imdbId}`);
   return res.data;
+};
+
+// Separate function for AI summary
+export const getMovieAISummary = async (plot) => {
+  if (!plot) return { summary: '' };
+  const res = await API.post("/movies/ai-summary", { plot });
+  return res.data;
+};
+
+// MovieBox sources only
+export const getMovieSources = async (tmdbId) => {
+  try {
+    const res = await API.get(`/movies/sources/${tmdbId}`, {
+      timeout: 8000 // 8 second timeout
+    });
+    return res.data;
+  } catch (error) {
+    console.error('Error fetching sources:', error);
+    return { sources: [] }; // Return empty array on error
+  }
 };

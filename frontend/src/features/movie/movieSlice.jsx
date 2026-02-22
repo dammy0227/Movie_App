@@ -1,3 +1,4 @@
+// features/movie/movieSlice.js
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import { 
   getTrendingMovies, 
@@ -7,73 +8,109 @@ import {
   getUpcomingMovies,
   searchMovies, 
   getMovieDetails,
+  getMovieOmdbRatings,
+  getMovieAISummary,
   getMovieSources
 } from "../../services/movieService";
 
-export const fetchTrending = createAsyncThunk("movie/fetchTrending", async (_, thunkAPI) => {
+export const fetchTrending = createAsyncThunk("movie/fetchTrending", async (_, { rejectWithValue }) => {
   try {
     return await getTrendingMovies();
   } catch (error) {
-    return thunkAPI.rejectWithValue(error.response?.data || error.message);
+    return rejectWithValue(error.response?.data || error.message);
   }
 });
 
-export const fetchPopular = createAsyncThunk("movie/fetchPopular", async (_, thunkAPI) => {
+export const fetchPopular = createAsyncThunk("movie/fetchPopular", async (_, { rejectWithValue }) => {
   try {
     return await getPopularMovies();
   } catch (error) {
-    return thunkAPI.rejectWithValue(error.response?.data || error.message);
+    return rejectWithValue(error.response?.data || error.message);
   }
 });
 
-export const fetchTopRated = createAsyncThunk("movie/fetchTopRated", async (_, thunkAPI) => {
+export const fetchTopRated = createAsyncThunk("movie/fetchTopRated", async (_, { rejectWithValue }) => {
   try {
     return await getTopRatedMovies();
   } catch (error) {
-    return thunkAPI.rejectWithValue(error.response?.data || error.message);
+    return rejectWithValue(error.response?.data || error.message);
   }
 });
 
-export const fetchNowPlaying = createAsyncThunk("movie/fetchNowPlaying", async (_, thunkAPI) => {
+export const fetchNowPlaying = createAsyncThunk("movie/fetchNowPlaying", async (_, { rejectWithValue }) => {
   try {
     return await getNowPlayingMovies();
   } catch (error) {
-    return thunkAPI.rejectWithValue(error.response?.data || error.message);
+    return rejectWithValue(error.response?.data || error.message);
   }
 });
 
-export const fetchUpcoming = createAsyncThunk("movie/fetchUpcoming", async (_, thunkAPI) => {
+export const fetchUpcoming = createAsyncThunk("movie/fetchUpcoming", async (_, { rejectWithValue }) => {
   try {
     return await getUpcomingMovies();
   } catch (error) {
-    return thunkAPI.rejectWithValue(error.response?.data || error.message);
+    return rejectWithValue(error.response?.data || error.message);
   }
 });
 
-export const fetchSearch = createAsyncThunk("movie/fetchSearch", async (query, thunkAPI) => {
+export const fetchSearch = createAsyncThunk("movie/fetchSearch", async (query, { rejectWithValue }) => {
   try {
     return await searchMovies(query);
   } catch (error) {
-    return thunkAPI.rejectWithValue(error.response?.data || error.message);
+    return rejectWithValue(error.response?.data || error.message);
   }
 });
 
-export const fetchMovieDetails = createAsyncThunk("movie/fetchMovieDetails", async (tmdbId, thunkAPI) => {
-  try {
-    // Include sources by default
-    return await getMovieDetails(tmdbId, true);
-  } catch (error) {
-    return thunkAPI.rejectWithValue(error.response?.data || error.message);
+// FAST - only movie details
+export const fetchMovieDetails = createAsyncThunk(
+  "movie/fetchMovieDetails", 
+  async (tmdbId, { rejectWithValue }) => {
+    try {
+      return await getMovieDetails(tmdbId);
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
   }
-});
+);
 
-export const fetchMovieSources = createAsyncThunk("movie/fetchMovieSources", async (tmdbId, thunkAPI) => {
-  try {
-    return await getMovieSources(tmdbId);
-  } catch (error) {
-    return thunkAPI.rejectWithValue(error.response?.data || error.message);
+// fetch OMDB ratings separately
+export const fetchOmdbRatings = createAsyncThunk(
+  "movie/fetchOmdbRatings",
+  async (imdbId) => {
+    try {
+      return await getMovieOmdbRatings(imdbId);
+    } catch (error) {
+      console.log(error)
+      return {};
+    }
   }
-});
+);
+
+// fetch AI summary separately
+export const fetchAISummary = createAsyncThunk(
+  "movie/fetchAISummary",
+  async (plot) => {
+    try {
+      return await getMovieAISummary(plot);
+    } catch (error) {
+      console.log(error)
+      return { summary: 'Summary unavailable' };
+    }
+  }
+);
+
+// Movie Sources only
+export const fetchMovieSources = createAsyncThunk(
+  "movie/fetchMovieSources", 
+  async (tmdbId) => {
+    try {
+      return await getMovieSources(tmdbId);
+    } catch (error) {
+      console.log(error)
+      return { sources: [] };
+    }
+  }
+);
 
 const initialState = {
   trending: [],
@@ -83,6 +120,7 @@ const initialState = {
   upcoming: [],
   searchResults: [],
   details: null,
+  omdbRatings: null,
   sources: null,
   loading: false,
   error: null,
@@ -100,6 +138,7 @@ const movieSlice = createSlice({
     },
     clearDetails: (state) => {
       state.details = null;
+      state.omdbRatings = null;
       state.sources = null;
     }
   },
@@ -189,7 +228,7 @@ const movieSlice = createSlice({
         state.error = action.payload; 
       })
 
-      // Movie Details (includes sources)
+      // Movie Details - FAST (only TMDB data)
       .addCase(fetchMovieDetails.pending, (state) => { 
         state.loading = true; 
         state.error = null; 
@@ -197,14 +236,15 @@ const movieSlice = createSlice({
       .addCase(fetchMovieDetails.fulfilled, (state, action) => { 
         state.loading = false; 
         state.details = action.payload || null;
-        // Extract sources if they exist in the response
-        if (action.payload?.moviebox) {
-          state.sources = action.payload.moviebox;
-        }
       })
       .addCase(fetchMovieDetails.rejected, (state, action) => { 
         state.loading = false; 
         state.error = action.payload; 
+      })
+
+      // OMDB Ratings (background)
+      .addCase(fetchOmdbRatings.fulfilled, (state, action) => {
+        state.omdbRatings = action.payload;
       })
 
       // Movie Sources only
@@ -216,9 +256,9 @@ const movieSlice = createSlice({
         state.loading = false; 
         state.sources = action.payload || null; 
       })
-      .addCase(fetchMovieSources.rejected, (state, action) => { 
+      .addCase(fetchMovieSources.rejected, (state) => { 
         state.loading = false; 
-        state.error = action.payload; 
+        state.sources = { sources: [] };
       });
   },
 });
