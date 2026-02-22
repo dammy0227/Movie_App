@@ -176,37 +176,33 @@ const MovieDetail = () => {
     }
   };
 
- const handlePlayVideo = async (source) => {
-  try {
-    const streamUrl = await getStreamUrl(source.url); // use API
-    dispatch(playVideo({
-      url: streamUrl,
-      title: details.title,
-      quality: source.quality
-    }));
-  } catch (error) {
-    console.error("Failed to play video:", error);
-  }
+const handlePlayVideo = (source) => {
+  // Get the stream URL directly (not async)
+  const streamUrl = getStreamUrl(source.url);
+  console.log('Stream URL:', streamUrl);
+  
+  dispatch(playVideo({
+    url: streamUrl,  // This should be a string URL
+    title: details.title,
+    quality: source.quality
+  }));
 };
 
-const handleDownload = async (url, quality) => {
-  try {
-    const downloadUrl = await getDownloadUrl(url, details.title, quality);
-    const filename = `${details.title.replace(/[^a-z0-9]/gi, "_")}_${quality}.mp4`;
+const handleDownload = (url, quality) => {
+  // Get download URL directly (not async)
+  const downloadUrl = getDownloadUrl(url, details.title, quality);
+  const filename = `${details.title.replace(/[^a-z0-9]/gi, "_")}_${quality}.mp4`;
 
-    if (isMobile) {
-      window.open(downloadUrl, "_blank");
-    } else {
-      const link = document.createElement("a");
-      link.href = downloadUrl;
-      link.download = filename;
-      link.target = "_blank";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-  } catch (error) {
-    console.error("Download failed:", error);
+  if (isMobile) {
+    window.open(downloadUrl, "_blank");
+  } else {
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = filename;
+    link.target = "_blank";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 };
   const handleRatingSubmit = async ({ rating, review }) => {

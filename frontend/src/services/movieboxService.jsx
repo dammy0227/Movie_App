@@ -1,29 +1,15 @@
 import API from "./api";
 
-// Get streaming URL (calls your backend `/api/moviebox/stream`)
-export const getStreamUrl = async (url) => {
-  try {
-    const response = await API.get("/moviebox/stream", {
-      params: { url }
-    });
-    return response.data; // backend should return the actual stream URL
-  } catch (error) {
-    console.error("Error getting stream URL:", error);
-    throw error;
-  }
+// Get stream URL - returns the full URL to the backend stream endpoint
+export const getStreamUrl = (url) => {
+  // Return the actual URL string, not a promise
+  return `${API.defaults.baseURL}/moviebox/stream?url=${encodeURIComponent(url)}`;
 };
 
-// Get download URL (calls your backend `/api/moviebox/download`)
-export const getDownloadUrl = async (url, title = "video", quality = "") => {
-  try {
-    const response = await API.get("/moviebox/download", {
-      params: { url, title, quality }
-    });
-    return response.data; // backend should return actual downloadable URL
-  } catch (error) {
-    console.error("Error getting download URL:", error);
-    throw error;
-  }
+// Get download URL - returns the full URL to the backend download endpoint
+export const getDownloadUrl = (url, title = "video", quality = "") => {
+  const params = new URLSearchParams({ url, title, quality });
+  return `${API.defaults.baseURL}/moviebox/download?${params}`;
 };
 
 // Direct URL (no backend)
