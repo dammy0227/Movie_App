@@ -39,16 +39,34 @@ const TVDetail = () => {
   const [seasonDetails, setSeasonDetails] = useState(null);
   const [loadingSeason, setLoadingSeason] = useState(false);
   const [trailerError, setTrailerError] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const playerRef = useRef(null);
 
+  // Get data from Redux store
   const { details, loading, error } = useSelector((state) => state.tv || {});
   const { summary, loading: aiLoading } = useSelector((state) => state.ai || {});
-  const { itemRatings, averageRatings } = useSelector((state) => state.rating);
+  const { itemRatings, averageRatings } = useSelector((state) => state.rating || {});
 
+  // Detect mobile device
   useEffect(() => {
-    dispatch(fetchTVDetails(id));
-    dispatch(fetchItemRating(id));
-    dispatch(fetchAverageRating(id));
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Parallel data fetching
+  useEffect(() => {
+    const fetchAllData = async () => {
+      await Promise.all([
+        dispatch(fetchTVDetails(id)),
+        dispatch(fetchItemRating(id)),
+        dispatch(fetchAverageRating(id))
+      ]);
+    };
+    fetchAllData();
   }, [dispatch, id]);
 
   // Fetch season details when season changes
@@ -58,7 +76,6 @@ const TVDetail = () => {
       
       setLoadingSeason(true);
       try {
-        // Get the TMDB API key from environment variables
         const API_KEY = import.meta.env.VITE_TMDB_API_KEY;
         
         if (!API_KEY) {
@@ -109,14 +126,14 @@ const TVDetail = () => {
     }
   }, [extractedTrailerKey]);
 
-  // YouTube player options
-  const opts = {
+  // YouTube player options - optimized for mobile
+  const opts = useMemo(() => ({
     height: '100%',
     width: '100%',
     playerVars: {
-      autoplay: 1,
-      mute: 1,
-      controls: 0,
+      autoplay: isMobile ? 0 : 1,
+      mute: isMobile ? 0 : 1,
+      controls: isMobile ? 1 : 0,
       showinfo: 0,
       rel: 0,
       loop: 1,
@@ -126,13 +143,15 @@ const TVDetail = () => {
       disablekb: 1,
       fs: 0,
     },
-  };
+  }), [trailerKey, isMobile]);
 
   // When player is ready
   const onPlayerReady = (event) => {
     playerRef.current = event.target;
-    event.target.mute(); // Start muted
-    event.target.playVideo();
+    if (!isMobile) {
+      event.target.mute();
+      event.target.playVideo();
+    }
   };
 
   // Toggle mute without reloading
@@ -154,16 +173,18 @@ const TVDetail = () => {
   };
 
   // Generate season options
-  const seasonOptions = details?.number_of_seasons 
-    ? Array.from({ length: details.number_of_seasons }, (_, i) => i + 1)
-    : [1];
+  const seasonOptions = useMemo(() => 
+    details?.number_of_seasons 
+      ? Array.from({ length: details.number_of_seasons }, (_, i) => i + 1)
+      : [1],
+    [details?.number_of_seasons]
+  );
 
   // Generate episode options from season details
   const episodeOptions = useMemo(() => {
     if (seasonDetails?.episodes && seasonDetails.episodes.length > 0) {
       return seasonDetails.episodes.map(ep => ep.episode_number);
     }
-    // Return empty array while loading
     return [];
   }, [seasonDetails]);
 
@@ -218,29 +239,29 @@ const TVDetail = () => {
     }));
   };
 
-  // SIMPLE download function like your working HTML
+  // Optimized download for mobile
   const handleDownload = (url, quality) => {
     const episodeTitle = `${details.name} S${selectedSeason}E${selectedEpisode}`;
     const filename = `${details.name.replace(/[^a-z0-9]/gi, '_')}_S${selectedSeason}E${selectedEpisode}_${quality}.mp4`;
-    
-    // Get the download URL
     const downloadUrl = getDownloadUrl(url, episodeTitle, quality);
     
-    // Create download link like HTML example
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.download = filename;
-    link.target = '_blank';
-    
-    // Trigger download
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    if (isMobile) {
+      // On mobile, open in new tab
+      window.open(downloadUrl, '_blank');
+    } else {
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   const handleRatingSubmit = async ({ rating, review }) => {
     if (!details) return;
-    const currentRating = itemRatings[id];
+    const currentRating = itemRatings?.[id];
     
     if (currentRating?.userRating) {
       await dispatch(updateUserRating({ 
@@ -272,7 +293,7 @@ const TVDetail = () => {
     }
   };
 
-  const currentRating = itemRatings[id];
+  const currentRating = itemRatings?.[id];
 
   // Show loading state
   if (loading) {
@@ -303,7 +324,7 @@ const TVDetail = () => {
       <Navbar />
       
       {/* Hero Section with Trailer or Backdrop */}
-      <div className="relative h-[70vh] w-full overflow-hidden">
+      <div className="relative h-[50vh] md:h-[70vh] w-full overflow-hidden">
         {showTrailerInHero && trailerKey && !trailerError ? (
           <>
             <div className="absolute inset-0">
@@ -320,18 +341,20 @@ const TVDetail = () => {
             </div>
             <div className="absolute inset-0 bg-linear-to-t from-black via-black/50 to-transparent" />
             
-            {/* Sound Toggle Button */}
-            <button
-              onClick={toggleMute}
-              className="absolute bottom-24 right-8 z-20 bg-black/50 p-3 rounded-full hover:bg-black/70 transition"
-              aria-label={isMuted ? "Unmute" : "Mute"}
-            >
-              {isMuted ? (
-                <VolumeX className="w-6 h-6 text-white" />
-              ) : (
-                <Volume2 className="w-6 h-6 text-white" />
-              )}
-            </button>
+            {/* Sound Toggle Button - Hide on mobile */}
+            {!isMobile && (
+              <button
+                onClick={toggleMute}
+                className="absolute bottom-24 right-8 z-20 bg-black/50 p-3 rounded-full hover:bg-black/70 transition"
+                aria-label={isMuted ? "Unmute" : "Mute"}
+              >
+                {isMuted ? (
+                  <VolumeX className="w-6 h-6 text-white" />
+                ) : (
+                  <Volume2 className="w-6 h-6 text-white" />
+                )}
+              </button>
+            )}
           </>
         ) : (
           <>
@@ -342,6 +365,7 @@ const TVDetail = () => {
               }
               alt={details.name}
               className="w-full h-full object-cover"
+              loading="lazy"
             />
             <div className="absolute inset-0 bg-linear-to-t from-black via-black/50 to-transparent" />
           </>
@@ -349,7 +373,7 @@ const TVDetail = () => {
       </div>
 
       {/* TV Show Details */}
-      <div className="relative z-10 max-w-7xl mx-auto px-4 -mt-48 pb-16">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 -mt-24 md:-mt-48 pb-16">
         <div className="flex flex-col md:flex-row gap-8">
           <div className="md:w-1/3 lg:w-1/4">
             <img
@@ -359,11 +383,12 @@ const TVDetail = () => {
               }
               alt={details.name}
               className="w-full rounded-2xl shadow-2xl"
+              loading="lazy"
             />
           </div>
 
           <div className="md:w-2/3 text-white">
-            <h1 className="text-4xl font-bold mb-2">{details.name}</h1>
+            <h1 className="text-3xl md:text-4xl font-bold mb-2">{details.name}</h1>
             
             <div className="flex flex-wrap items-center gap-4 mb-6">
               <div className="flex items-center">
@@ -392,8 +417,8 @@ const TVDetail = () => {
             <div className="mb-6">
               <RatingDisplay
                 userRating={currentRating?.userRating}
-                averageRating={averageRatings[id]?.average}
-                totalRatings={averageRatings[id]?.total}
+                averageRating={averageRatings?.[id]?.average}
+                totalRatings={averageRatings?.[id]?.total}
                 onRateClick={() => setShowRatingModal(true)}
                 isRated={!!currentRating?.userRating}
               />
@@ -408,13 +433,15 @@ const TVDetail = () => {
               )}
             </div>
 
-            <p className="text-gray-300 leading-relaxed mb-8">{details.overview || 'No overview available.'}</p>
+            <p className="text-gray-300 leading-relaxed text-sm md:text-base mb-8">
+              {details.overview || 'No overview available.'}
+            </p>
 
             {/* Actions */}
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-col sm:flex-row gap-4">
               <button
                 onClick={handleAddToWatchlist}
-                className="flex items-center px-6 py-3 bg-red-600 rounded-lg hover:bg-red-700 transition"
+                className="flex items-center justify-center px-6 py-3 bg-red-600 rounded-lg hover:bg-red-700 transition"
               >
                 <Heart className="w-5 h-5 mr-2" />
                 Add to Watchlist
@@ -422,7 +449,7 @@ const TVDetail = () => {
               
               <button
                 onClick={handleAISummary}
-                className="flex items-center px-6 py-3 bg-purple-600 rounded-lg hover:bg-purple-700 transition"
+                className="flex items-center justify-center px-6 py-3 bg-purple-600 rounded-lg hover:bg-purple-700 transition"
               >
                 <Sparkles className="w-5 h-5 mr-2" />
                 AI Summary
@@ -431,7 +458,7 @@ const TVDetail = () => {
               {/* Episode Selector Toggle */}
               <button
                 onClick={() => setShowEpisodeSelector(!showEpisodeSelector)}
-                className="flex items-center px-6 py-3 bg-gray-600 rounded-lg hover:bg-gray-700 transition"
+                className="flex items-center justify-center px-6 py-3 bg-gray-600 rounded-lg hover:bg-gray-700 transition"
               >
                 <ChevronDown className="w-5 h-5 mr-2" />
                 Select Episode
@@ -448,7 +475,9 @@ const TVDetail = () => {
                 {aiLoading ? (
                   <LoadingSpinner />
                 ) : (
-                  <p className="text-gray-300">{summary || 'No summary available.'}</p>
+                  <p className="text-gray-300 text-sm md:text-base">
+                    {summary || 'No summary available.'}
+                  </p>
                 )}
               </div>
             )}
@@ -457,14 +486,14 @@ const TVDetail = () => {
             {showEpisodeSelector && (
               <div className="mt-4 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
                 <h3 className="text-lg font-semibold text-white mb-3">Choose Episode</h3>
-                <div className="flex flex-wrap gap-4">
-                  <div className="flex-1 min-w-50">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex-1">
                     <label className="block text-sm text-gray-400 mb-1">Season</label>
                     <select
                       value={selectedSeason}
                       onChange={(e) => {
                         setSelectedSeason(parseInt(e.target.value));
-                        setShowSources(false); // Hide sources when season changes
+                        setShowSources(false);
                       }}
                       className="w-full bg-gray-900 text-white px-4 py-2 rounded-lg border border-gray-700"
                     >
@@ -474,19 +503,19 @@ const TVDetail = () => {
                     </select>
                   </div>
                   
-                  <div className="flex-1 min-w-50">
+                  <div className="flex-1">
                     <label className="block text-sm text-gray-400 mb-1">Episode</label>
                     {loadingSeason ? (
                       <div className="bg-gray-900 text-white px-4 py-2 rounded-lg border border-gray-700 flex items-center">
                         <span className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mr-2"></span>
-                        Loading episodes...
+                        Loading...
                       </div>
                     ) : episodeOptions.length > 0 ? (
                       <select
                         value={selectedEpisode}
                         onChange={(e) => {
                           setSelectedEpisode(parseInt(e.target.value));
-                          setShowSources(false); // Hide sources when episode changes
+                          setShowSources(false);
                         }}
                         className="w-full bg-gray-900 text-white px-4 py-2 rounded-lg border border-gray-700"
                       >
@@ -494,14 +523,14 @@ const TVDetail = () => {
                           const episode = seasonDetails?.episodes?.find(ep => ep.episode_number === episodeNum);
                           return (
                             <option key={episodeNum} value={episodeNum}>
-                              Episode {episodeNum}{episode?.name ? ` - ${episode.name}` : ''}
+                              Episode {episodeNum}{episode?.name && !isMobile ? ` - ${episode.name}` : ''}
                             </option>
                           );
                         })}
                       </select>
                     ) : (
                       <div className="bg-gray-900 text-gray-400 px-4 py-2 rounded-lg border border-gray-700">
-                        No episode information available
+                        No episodes
                       </div>
                     )}
                   </div>
@@ -509,7 +538,7 @@ const TVDetail = () => {
                   <div className="flex items-end">
                     <button
                       onClick={handleGetEpisodeSources}
-                      className="px-6 py-2 bg-green-600 rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-6 py-2 bg-green-600 rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
                       disabled={loadingSources || loadingSeason || episodeOptions.length === 0}
                     >
                       {loadingSources ? (
@@ -548,21 +577,19 @@ const TVDetail = () => {
                           <span className="text-green-500 font-bold">{source.quality}</span>
                           <span className="text-xs text-gray-400">{formatFileSize(source.size)}</span>
                         </div>
-                        <div className="flex gap-2">
-                          {/* Play button */}
+                        <div className="flex flex-col sm:flex-row gap-2">
                           <button
                             onClick={() => handlePlayVideo(source)}
-                            className="flex-1 flex items-center justify-center px-3 py-2 bg-green-600 rounded hover:bg-green-700 text-sm"
+                            className="flex-1 px-3 py-2 bg-green-600 rounded hover:bg-green-700 text-sm"
                           >
-                            <Play className="w-4 h-4 mr-1" /> Play
+                            <Play className="w-4 h-4 inline mr-1" /> Play
                           </button>
                           
-                          {/* Download button */}
                           <button
                             onClick={() => handleDownload(source.url, source.quality)}
-                            className="flex-1 flex items-center justify-center px-3 py-2 bg-blue-600 rounded hover:bg-blue-700 text-sm"
+                            className="flex-1 px-3 py-2 bg-blue-600 rounded hover:bg-blue-700 text-sm"
                           >
-                            <Download className="w-4 h-4 mr-1" /> Download
+                            <Download className="w-4 h-4 inline mr-1" /> Download
                           </button>
                         </div>
                       </div>
@@ -578,7 +605,7 @@ const TVDetail = () => {
             {currentRating?.review && (
               <div className="mt-4 p-4 bg-gray-800/50 rounded-lg">
                 <h3 className="text-sm font-semibold text-gray-400 mb-1">Your Review</h3>
-                <p className="text-white">"{currentRating.review}"</p>
+                <p className="text-white text-sm md:text-base">"{currentRating.review}"</p>
               </div>
             )}
           </div>

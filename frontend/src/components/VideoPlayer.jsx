@@ -13,6 +13,17 @@ const VideoPlayer = () => {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [useAlternative, setUseAlternative] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const handleClosePlayer = useCallback(() => {
     dispatch(closePlayer());
@@ -32,10 +43,7 @@ const VideoPlayer = () => {
     };
 
     document.addEventListener('click', handleNavClick);
-
-    return () => {
-      document.removeEventListener('click', handleNavClick);
-    };
+    return () => document.removeEventListener('click', handleNavClick);
   }, [handleClosePlayer]);
 
   const tryAlternativePlayback = useCallback(() => {
@@ -49,13 +57,18 @@ const VideoPlayer = () => {
   }, [videoUrl]);
 
   const downloadVideo = useCallback(() => {
-    const link = document.createElement('a');
-    link.href = videoUrl;
-    link.download = `${title}_${quality}.mp4`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }, [videoUrl, title, quality]);
+    if (isMobile) {
+      // On mobile, just open in new tab
+      window.open(videoUrl, '_blank');
+    } else {
+      const link = document.createElement('a');
+      link.href = videoUrl;
+      link.download = `${title}_${quality}.mp4`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  }, [videoUrl, title, quality, isMobile]);
 
   useEffect(() => {
     if (videoUrl !== prevVideoUrlRef.current) {
@@ -77,10 +90,9 @@ const VideoPlayer = () => {
       const handleCanPlay = () => {
         console.log('Video can play now');
         setLoading(false);
-        video.play().catch(e => {
-          console.log('Play failed:', e);
-          setLoading(false);
-        });
+        if (!isMobile) {
+          video.play().catch(e => console.log('Play failed:', e));
+        }
       };
       
       const handleError = (error) => {
@@ -88,11 +100,11 @@ const VideoPlayer = () => {
         setLoading(false);
         
         if (video.error && video.error.code === 4) {
-          setError('Video cannot be played directly. This might be due to format restrictions or expired links.');
+          setError('Video cannot be played directly. Try opening in browser.');
         } else if (video.error) {
-          setError(`Error loading video: ${video.error.message || 'Unknown error'}`);
+          setError(`Error: ${video.error.message || 'Unknown error'}`);
         } else {
-          setError('Failed to load video. The source might be unavailable.');
+          setError('Failed to load video.');
         }
       };
       
@@ -118,7 +130,7 @@ const VideoPlayer = () => {
       video.addEventListener('playing', handlePlaying);
       
       video.crossOrigin = 'anonymous';
-      video.preload = 'auto';
+      video.preload = isMobile ? 'metadata' : 'auto'; // Load less on mobile
       
       video.load();
       
@@ -130,7 +142,7 @@ const VideoPlayer = () => {
         video.removeEventListener('playing', handlePlaying);
       };
     }
-  }, [videoUrl, useAlternative]);
+  }, [videoUrl, useAlternative, isMobile]);
 
   if (!videoUrl) return null;
 
@@ -141,42 +153,44 @@ const VideoPlayer = () => {
       <div className="relative z-10 w-full h-full pointer-events-auto flex items-center justify-center">
         <button
           onClick={handleClosePlayer}
-          className="absolute top-4 right-4 z-20 bg-black/50 p-2 rounded-full hover:bg-black/70 transition"
+          className="absolute top-2 right-2 md:top-4 md:right-4 z-20 bg-black/50 p-2 rounded-full hover:bg-black/70 transition"
         >
-          <X className="w-6 h-6 text-white" />
+          <X className="w-5 h-5 md:w-6 md:h-6 text-white" />
         </button>
 
-        <div className="absolute top-4 left-4 z-20 text-white bg-black/50 px-4 py-2 rounded-lg">
-          <h2 className="text-xl font-bold">{title}</h2>
-          <p className="text-sm text-gray-300">Quality: {quality}</p>
+        <div className="absolute top-2 left-2 md:top-4 md:left-4 z-20 text-white bg-black/50 px-3 py-1 md:px-4 md:py-2 rounded-lg">
+          <h2 className="text-sm md:text-xl font-bold truncate max-w-[200px] md:max-w-none">
+            {title}
+          </h2>
+          <p className="text-xs md:text-sm text-gray-300">Quality: {quality}</p>
         </div>
 
         {loading && !error && !useAlternative && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-8 h-8 md:w-12 md:h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
           </div>
         )}
 
         {useAlternative ? (
-          <div className="bg-gray-900 rounded-lg p-8 max-w-md text-center border border-gray-700">
-            <AlertCircle className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-white mb-2">Video Cannot Be Played Directly</h3>
-            <p className="text-gray-400 mb-6">
-              The video format might not be supported in your browser. Try these alternatives:
+          <div className="bg-gray-900 rounded-lg p-4 md:p-8 max-w-xs md:max-w-md text-center border border-gray-700 mx-4">
+            <AlertCircle className="w-12 h-12 md:w-16 md:h-16 text-yellow-500 mx-auto mb-4" />
+            <h3 className="text-lg md:text-xl font-bold text-white mb-2">Cannot Play Video</h3>
+            <p className="text-sm md:text-base text-gray-400 mb-6">
+              Try these alternatives:
             </p>
-            <div className="space-y-3">
+            <div className="space-y-2 md:space-y-3">
               <button
                 onClick={openInNewTab}
-                className="w-full flex items-center justify-center px-4 py-3 bg-green-600 rounded-lg hover:bg-green-700 transition text-white"
+                className="w-full flex items-center justify-center px-4 py-2 md:px-4 md:py-3 bg-green-600 rounded-lg hover:bg-green-700 transition text-white text-sm md:text-base"
               >
-                <RefreshCw className="w-5 h-5 mr-2" />
-                Open in New Tab
+                <RefreshCw className="w-4 h-4 md:w-5 md:h-5 mr-2" />
+                Open in Browser
               </button>
               <button
                 onClick={downloadVideo}
-                className="w-full flex items-center justify-center px-4 py-3 bg-blue-600 rounded-lg hover:bg-blue-700 transition text-white"
+                className="w-full flex items-center justify-center px-4 py-2 md:px-4 md:py-3 bg-blue-600 rounded-lg hover:bg-blue-700 transition text-white text-sm md:text-base"
               >
-                <Download className="w-5 h-5 mr-2" />
+                <Download className="w-4 h-4 md:w-5 md:h-5 mr-2" />
                 Download Video
               </button>
               <button
@@ -184,37 +198,33 @@ const VideoPlayer = () => {
                   setUseAlternative(false);
                   setError(null);
                   setLoading(true);
-                  if (videoRef.current) {
-                    videoRef.current.load();
-                  }
+                  if (videoRef.current) videoRef.current.load();
                 }}
-                className="w-full flex items-center justify-center px-4 py-3 bg-gray-700 rounded-lg hover:bg-gray-600 transition text-white"
+                className="w-full flex items-center justify-center px-4 py-2 md:px-4 md:py-3 bg-gray-700 rounded-lg hover:bg-gray-600 transition text-white text-sm md:text-base"
               >
                 Try Again
               </button>
             </div>
           </div>
         ) : error ? (
-          <div className="bg-gray-900 rounded-lg p-8 max-w-md text-center border border-gray-700">
-            <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-white mb-2">Playback Error</h3>
-            <p className="text-gray-400 mb-6">{error}</p>
-            <div className="space-y-3">
+          <div className="bg-gray-900 rounded-lg p-4 md:p-8 max-w-xs md:max-w-md text-center border border-gray-700 mx-4">
+            <AlertCircle className="w-12 h-12 md:w-16 md:h-16 text-red-500 mx-auto mb-4" />
+            <h3 className="text-lg md:text-xl font-bold text-white mb-2">Playback Error</h3>
+            <p className="text-sm md:text-base text-gray-400 mb-6">{error}</p>
+            <div className="space-y-2 md:space-y-3">
               <button
                 onClick={tryAlternativePlayback}
-                className="w-full flex items-center justify-center px-4 py-3 bg-green-600 rounded-lg hover:bg-green-700 transition text-white"
+                className="w-full flex items-center justify-center px-4 py-2 md:px-4 md:py-3 bg-green-600 rounded-lg hover:bg-green-700 transition text-white text-sm md:text-base"
               >
-                Try Alternative Method
+                Try Alternative
               </button>
               <button
                 onClick={() => {
                   setError(null);
                   setLoading(true);
-                  if (videoRef.current) {
-                    videoRef.current.load();
-                  }
+                  if (videoRef.current) videoRef.current.load();
                 }}
-                className="w-full flex items-center justify-center px-4 py-3 bg-gray-700 rounded-lg hover:bg-gray-600 transition text-white"
+                className="w-full flex items-center justify-center px-4 py-2 md:px-4 md:py-3 bg-gray-700 rounded-lg hover:bg-gray-600 transition text-white text-sm md:text-base"
               >
                 Try Again
               </button>
@@ -224,13 +234,13 @@ const VideoPlayer = () => {
           <video
             ref={videoRef}
             controls
-            autoPlay
+            autoPlay={!isMobile}
             className="max-w-full max-h-full"
-            style={{ maxHeight: '90vh', maxWidth: '90vw' }}
+            style={{ maxHeight: '90vh', maxWidth: '100vw' }}
+            playsInline 
+            preload={isMobile ? 'metadata' : 'auto'}
           >
             <source src={videoUrl} type="video/mp4" />
-            <source src={videoUrl} type="video/webm" />
-            <source src={videoUrl} type="video/ogg" />
             Your browser does not support the video tag.
           </video>
         )}

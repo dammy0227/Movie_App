@@ -34,16 +34,33 @@ const MovieDetail = () => {
   const [sources, setSources] = useState([]);
   const [loadingSources, setLoadingSources] = useState(false);
   const [trailerError, setTrailerError] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const playerRef = useRef(null);
   
   const { details, loading, error } = useSelector((state) => state.movie);
   const { summary, loading: aiLoading } = useSelector((state) => state.ai);
   const { itemRatings, averageRatings } = useSelector((state) => state.rating);
 
+  // Detect mobile device
   useEffect(() => {
-    dispatch(fetchMovieDetails(id));
-    dispatch(fetchItemRating(id));
-    dispatch(fetchAverageRating(id));
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Parallel data fetching
+  useEffect(() => {
+    const fetchAllData = async () => {
+      await Promise.all([
+        dispatch(fetchMovieDetails(id)),
+        dispatch(fetchItemRating(id)),
+        dispatch(fetchAverageRating(id))
+      ]);
+    };
+    fetchAllData();
   }, [dispatch, id]);
 
   useEffect(() => {
@@ -56,7 +73,7 @@ const MovieDetail = () => {
     }
   }, [details, dispatch]);
 
-  // Extract trailer key
+  // Extract trailer key with useMemo
   const extractedTrailerKey = useMemo(() => {
     if (details?.videos?.results) {
       const trailer = details.videos.results.find(
@@ -80,14 +97,14 @@ const MovieDetail = () => {
     }
   }, [extractedTrailerKey]);
 
-  // YouTube player options
-  const opts = {
+  // YouTube player options - optimized for mobile
+  const opts = useMemo(() => ({
     height: '100%',
     width: '100%',
     playerVars: {
-      autoplay: 1,
-      mute: 1,
-      controls: 0,
+      autoplay: isMobile ? 0 : 1, // Don't autoplay on mobile
+      mute: isMobile ? 0 : 1,
+      controls: isMobile ? 1 : 0,
       showinfo: 0,
       rel: 0,
       loop: 1,
@@ -97,16 +114,16 @@ const MovieDetail = () => {
       disablekb: 1,
       fs: 0,
     },
-  };
+  }), [trailerKey, isMobile]);
 
-  // When player is ready
   const onPlayerReady = (event) => {
     playerRef.current = event.target;
-    event.target.mute(); // Start muted
-    event.target.playVideo();
+    if (!isMobile) {
+      event.target.mute();
+      event.target.playVideo();
+    }
   };
 
-  // Toggle mute without reloading
   const toggleMute = useCallback(() => {
     if (playerRef.current) {
       if (isMuted) {
@@ -118,7 +135,6 @@ const MovieDetail = () => {
     }
   }, [isMuted]);
 
-  // Handle player error
   const onPlayerError = (error) => {
     console.log('YouTube player error:', error);
     setTrailerError(true);
@@ -169,39 +185,23 @@ const MovieDetail = () => {
     }));
   };
 
-  // SIMPLE download function like your working HTML
+  // Optimized download for mobile
   const handleDownload = (url, quality) => {
-    // Create filename
     const filename = `${details.title.replace(/[^a-z0-9]/gi, '_')}_${quality}.mp4`;
-    
-    // Get the download URL
     const downloadUrl = getDownloadUrl(url, details.title, quality);
     
-    // Create download link like HTML example
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.download = filename;
-    link.target = '_blank';
-    
-    // Show download status
-    const status = document.getElementById('status');
-    if (status) {
-      status.className = 'status info';
-      status.textContent = `Downloading ${quality}...`;
+    if (isMobile) {
+      // On mobile, open in new tab instead of trying to download
+      window.open(downloadUrl, '_blank');
+    } else {
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
-    
-    // Trigger download
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    // Reset status after delay
-    setTimeout(() => {
-      if (status) {
-        status.className = 'status success';
-        status.textContent = `Found ${sources.length} sources`;
-      }
-    }, 2000);
   };
 
   const handleRatingSubmit = async ({ rating, review }) => {
@@ -263,7 +263,7 @@ const MovieDetail = () => {
       <Navbar />
       
       {/* Hero Section with Trailer or Backdrop */}
-      <div className="relative h-[70vh] w-full overflow-hidden">
+      <div className="relative h-[50vh] md:h-[70vh] w-full overflow-hidden">
         {showTrailerInHero && trailerKey && !trailerError ? (
           <>
             <div className="absolute inset-0">
@@ -280,18 +280,20 @@ const MovieDetail = () => {
             </div>
             <div className="absolute inset-0 bg-linear-to-t from-black via-black/50 to-transparent" />
             
-            {/* Sound Toggle Button */}
-            <button
-              onClick={toggleMute}
-              className="absolute bottom-24 right-8 z-20 bg-black/50 p-3 rounded-full hover:bg-black/70 transition"
-              aria-label={isMuted ? "Unmute" : "Mute"}
-            >
-              {isMuted ? (
-                <VolumeX className="w-6 h-6 text-white" />
-              ) : (
-                <Volume2 className="w-6 h-6 text-white" />
-              )}
-            </button>
+            {/* Sound Toggle Button - Hide on mobile */}
+            {!isMobile && (
+              <button
+                onClick={toggleMute}
+                className="absolute bottom-24 right-8 z-20 bg-black/50 p-3 rounded-full hover:bg-black/70 transition"
+                aria-label={isMuted ? "Unmute" : "Mute"}
+              >
+                {isMuted ? (
+                  <VolumeX className="w-6 h-6 text-white" />
+                ) : (
+                  <Volume2 className="w-6 h-6 text-white" />
+                )}
+              </button>
+            )}
           </>
         ) : (
           <>
@@ -299,6 +301,7 @@ const MovieDetail = () => {
               src={`https://image.tmdb.org/t/p/original${details.backdrop_path}`}
               alt={details.title}
               className="w-full h-full object-cover"
+              loading="lazy"
             />
             <div className="absolute inset-0 bg-linear-to-t from-black via-black/50 to-transparent" />
           </>
@@ -306,7 +309,7 @@ const MovieDetail = () => {
       </div>
 
       {/* Movie Details */}
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-48">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-24 md:-mt-48">
         <div className="flex flex-col md:flex-row gap-8">
           {/* Poster */}
           <div className="md:w-1/3 lg:w-1/4">
@@ -314,12 +317,13 @@ const MovieDetail = () => {
               src={`https://image.tmdb.org/t/p/w500${details.poster_path}`}
               alt={details.title}
               className="w-full rounded-2xl shadow-2xl"
+              loading="lazy"
             />
           </div>
 
           {/* Info */}
           <div className="md:w-2/3 lg:w-3/4 text-white">
-            <h1 className="text-4xl md:text-5xl font-bold mb-2">{details.title}</h1>
+            <h1 className="text-3xl md:text-5xl font-bold mb-2">{details.title}</h1>
             
             {/* Metadata */}
             <div className="flex flex-wrap items-center gap-4 mb-6">
@@ -374,22 +378,25 @@ const MovieDetail = () => {
             {/* Overview */}
             <div className="mb-8">
               <h2 className="text-xl font-semibold mb-2">Overview</h2>
-              <p className="text-gray-300 leading-relaxed">{details.overview}</p>
+              <p className="text-gray-300 leading-relaxed text-sm md:text-base">
+                {details.overview}
+              </p>
             </div>
 
-            {/* Cast */}
-            {details.credits?.cast?.slice(0, 5).length > 0 && (
+            {/* Cast - Limit on mobile */}
+            {details.credits?.cast?.slice(0, isMobile ? 3 : 5).length > 0 && (
               <div className="mb-8">
                 <h2 className="text-xl font-semibold mb-3">Cast</h2>
                 <div className="flex flex-wrap gap-4">
-                  {details.credits.cast.slice(0, 5).map(actor => (
+                  {details.credits.cast.slice(0, isMobile ? 3 : 5).map(actor => (
                     <div key={actor.id} className="text-center">
-                      <div className="w-16 h-16 rounded-full bg-gray-700 overflow-hidden mb-2">
+                      <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-700 overflow-hidden mb-2">
                         {actor.profile_path ? (
                           <img
                             src={`https://image.tmdb.org/t/p/w200${actor.profile_path}`}
                             alt={actor.name}
                             className="w-full h-full object-cover"
+                            loading="lazy"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
@@ -397,7 +404,7 @@ const MovieDetail = () => {
                           </div>
                         )}
                       </div>
-                      <p className="text-sm font-medium">{actor.name}</p>
+                      <p className="text-xs md:text-sm font-medium">{actor.name}</p>
                       <p className="text-xs text-gray-400">{actor.character}</p>
                     </div>
                   ))}
@@ -405,11 +412,11 @@ const MovieDetail = () => {
               </div>
             )}
 
-            {/* Actions */}
-            <div className="flex flex-wrap gap-4">
+            {/* Actions - Stack on mobile */}
+            <div className="flex flex-col sm:flex-row gap-4">
               <button
                 onClick={handleAddToWatchlist}
-                className="flex items-center px-6 py-3 bg-red-600 rounded-lg hover:bg-red-700 transition"
+                className="flex items-center justify-center px-6 py-3 bg-red-600 rounded-lg hover:bg-red-700 transition"
               >
                 <Heart className="w-5 h-5 mr-2" />
                 Add to Watchlist
@@ -417,16 +424,15 @@ const MovieDetail = () => {
               
               <button
                 onClick={handleAISummary}
-                className="flex items-center px-6 py-3 bg-purple-600 rounded-lg hover:bg-purple-700 transition"
+                className="flex items-center justify-center px-6 py-3 bg-purple-600 rounded-lg hover:bg-purple-700 transition"
               >
                 <Sparkles className="w-5 h-5 mr-2" />
                 AI Summary
               </button>
 
-              {/* Watch Now Button */}
               <button
                 onClick={handleGetSources}
-                className="flex items-center px-6 py-3 bg-green-600 rounded-lg hover:bg-green-700 transition"
+                className="flex items-center justify-center px-6 py-3 bg-green-600 rounded-lg hover:bg-green-700 transition"
               >
                 <Play className="w-5 h-5 mr-2" />
                 {showSources ? 'Hide Sources' : 'Watch Now'}
@@ -443,7 +449,9 @@ const MovieDetail = () => {
                 {aiLoading ? (
                   <LoadingSpinner />
                 ) : (
-                  <p className="text-gray-300">{summary || 'No summary available.'}</p>
+                  <p className="text-gray-300 text-sm md:text-base">
+                    {summary || 'No summary available.'}
+                  </p>
                 )}
               </div>
             )}
@@ -462,33 +470,29 @@ const MovieDetail = () => {
                   </div>
                 ) : sources.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                    {sources.map((source) => {
-                      return (
-                        <div key={source.quality} className="bg-gray-900 rounded-lg p-3 border border-gray-700">
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-green-500 font-bold">{source.quality}</span>
-                            <span className="text-xs text-gray-400">{formatFileSize(source.size)}</span>
-                          </div>
-                          <div className="flex gap-2">
-                            {/* Play button */}
-                            <button
-                              onClick={() => handlePlayVideo(source)}
-                              className="flex-1 flex items-center justify-center px-3 py-2 bg-green-600 rounded hover:bg-green-700 text-sm"
-                            >
-                              <Play className="w-4 h-4 mr-1" /> Play
-                            </button>
-                            
-                            {/* Download button - SIMPLE like HTML */}
-                            <button
-                              onClick={() => handleDownload(source.url, source.quality)}
-                              className="flex-1 flex items-center justify-center px-3 py-2 bg-blue-600 rounded hover:bg-blue-700 text-sm"
-                            >
-                              <Download className="w-4 h-4 mr-1" /> Download
-                            </button>
-                          </div>
+                    {sources.map((source) => (
+                      <div key={source.quality} className="bg-gray-900 rounded-lg p-3 border border-gray-700">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-green-500 font-bold">{source.quality}</span>
+                          <span className="text-xs text-gray-400">{formatFileSize(source.size)}</span>
                         </div>
-                      );
-                    })}
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <button
+                            onClick={() => handlePlayVideo(source)}
+                            className="flex-1 px-3 py-2 bg-green-600 rounded hover:bg-green-700 text-sm"
+                          >
+                            <Play className="w-4 h-4 inline mr-1" /> Play
+                          </button>
+                          
+                          <button
+                            onClick={() => handleDownload(source.url, source.quality)}
+                            className="flex-1 px-3 py-2 bg-blue-600 rounded hover:bg-blue-700 text-sm"
+                          >
+                            <Download className="w-4 h-4 inline mr-1" /> Download
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <p className="text-gray-400 text-center py-4">No streaming sources available</p>
@@ -500,7 +504,7 @@ const MovieDetail = () => {
             {currentRating?.review && (
               <div className="mt-4 p-4 bg-gray-800/50 rounded-lg">
                 <h3 className="text-sm font-semibold text-gray-400 mb-1">Your Review</h3>
-                <p className="text-white">"{currentRating.review}"</p>
+                <p className="text-white text-sm md:text-base">"{currentRating.review}"</p>
               </div>
             )}
           </div>
