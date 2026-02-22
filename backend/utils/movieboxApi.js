@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { wrapper } from 'axios-cookiejar-support';
 import { CookieJar } from 'tough-cookie';
+import https from 'https';
 
 // Configuration
 const MIRROR_HOSTS = [
@@ -24,12 +25,18 @@ const DEFAULT_HEADERS = {
     'X-Real-IP': '1.1.1.1'
 };
 
+// Create HTTPS agent that ignores SSL errors (fix for Render)
+const httpsAgent = new https.Agent({
+    rejectUnauthorized: false
+});
+
 // Session management
 const jar = new CookieJar();
 const axiosInstance = wrapper(axios.create({
     jar,
     withCredentials: true,
-    timeout: 30000
+    timeout: 30000,
+    httpsAgent: httpsAgent
 }));
 
 let cookiesInitialized = false;
@@ -56,23 +63,28 @@ function processApiResponse(response) {
 
 async function ensureCookiesAreAssigned() {
     if (!cookiesInitialized) {
+        console.log('🔄 Initializing MovieBox session...');
+        
         for (const host of MIRROR_HOSTS) {
             try {
+                console.log(`Trying host: ${host}`);
                 await rateLimit();
                 const response = await axiosInstance.get(`https://${host}/wefeed-h5-bff/app/get-latest-app-pkgs?app_name=moviebox`, {
-                    headers: { ...DEFAULT_HEADERS, Host: host }
+                    headers: { ...DEFAULT_HEADERS, Host: host },
+                    timeout: 10000
                 });
                 
                 if (response && response.data) {
-                    console.log(`MovieBox session initialized with host: ${host}`);
+                    console.log(`✅ Session initialized with host: ${host}`);
                     cookiesInitialized = true;
                     return true;
                 }
             } catch (error) {
-                console.log(`Failed to initialize with host ${host}:`, error.message);
+                console.log(`❌ Failed to initialize with host ${host}:`, error.message);
                 continue;
             }
         }
+        console.log('❌ All hosts failed to initialize');
     }
     return cookiesInitialized;
 }
@@ -85,11 +97,17 @@ async function makeApiRequest(url, options = {}) {
         url: url,
         headers: { ...DEFAULT_HEADERS, ...options.headers },
         withCredentials: true,
+        httpsAgent: httpsAgent,
         ...options
     };
     
-    const response = await axiosInstance(config);
-    return response;
+    try {
+        const response = await axiosInstance(config);
+        return response;
+    } catch (error) {
+        console.log(`Request failed to ${url.substring(0, 100)}:`, error.message);
+        throw error;
+    }
 }
 
 // Search MovieBox by title
@@ -109,7 +127,8 @@ export const searchMovieBox = async (title, year = null) => {
                 response = await makeApiRequest(`https://${host}/wefeed-h5-bff/web/subject/search`, {
                     method: 'POST',
                     data: payload,
-                    headers: { Host: host }
+                    headers: { Host: host },
+                    timeout: 10000
                 });
                 if (response) break;
             } catch (error) {
@@ -150,7 +169,6 @@ export const searchMovieBox = async (title, year = null) => {
 
 // Search MovieBox by IMDb ID
 export const searchMovieBoxByImdbId = async (imdbId) => {
-    // Remove 'tt' prefix if present
     const cleanImdbId = imdbId.replace('tt', '');
     
     try {
@@ -168,7 +186,8 @@ export const searchMovieBoxByImdbId = async (imdbId) => {
                 response = await makeApiRequest(`https://${host}/wefeed-h5-bff/web/subject/search`, {
                     method: 'POST',
                     data: payload,
-                    headers: { Host: host }
+                    headers: { Host: host },
+                    timeout: 10000
                 });
                 if (response) break;
             } catch (error) {
@@ -201,6 +220,8 @@ export const searchMovieBoxByImdbId = async (imdbId) => {
 
 // Get streaming sources for a MovieBox ID
 export const getMovieBoxSources = async (movieboxId, season = 0, episode = 0) => {
+    console.log(`🔍 Getting sources for MovieBox ID: ${movieboxId}, S:${season}, E:${episode}`);
+    
     try {
         // First get detailPath
         let detailPath = null;
@@ -210,13 +231,15 @@ export const getMovieBoxSources = async (movieboxId, season = 0, episode = 0) =>
                 const infoResponse = await makeApiRequest(`https://${host}/wefeed-h5-bff/web/subject/detail`, {
                     method: 'GET',
                     params: { subjectId: movieboxId },
-                    headers: { Host: host }
+                    headers: { Host: host },
+                    timeout: 10000
                 });
                 
                 if (infoResponse && infoResponse.data) {
                     const info = processApiResponse(infoResponse);
                     if (info.subject) {
                         detailPath = info.subject.detailPath;
+                        console.log(`✅ Found detailPath: ${detailPath} on host: ${host}`);
                         break;
                     }
                 }
