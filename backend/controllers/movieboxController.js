@@ -1,12 +1,20 @@
 import axios from 'axios';
 import https from 'https';
 
-// Create HTTPS agent that ignores SSL errors (fix for Render)
+// Create HTTPS agent that ignores SSL errors
 const httpsAgent = new https.Agent({
-    rejectUnauthorized: false
+    rejectUnauthorized: false,
+    keepAlive: true
 });
 
-// Streaming endpoint - with SSL fix
+// Create a dedicated axios instance for streaming
+const streamAxios = axios.create({
+    timeout: 30000,
+    maxRedirects: 5,
+    httpsAgent: httpsAgent
+});
+
+// Streaming endpoint
 export const streamMovieBox = async (req, res) => {
   try {
     const streamUrl = req.query.url;
@@ -24,24 +32,19 @@ export const streamMovieBox = async (req, res) => {
       'Access-Control-Allow-Headers': 'Range',
     });
     
-    // Handle preflight
     if (req.method === 'OPTIONS') {
       return res.status(200).end();
     }
     
-    const response = await axios({
+    const response = await streamAxios({
       method: 'GET',
       url: streamUrl,
       responseType: 'stream',
-      httpsAgent: httpsAgent,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Referer': 'https://fmoviesunblocked.net/',
         'Origin': 'https://fmoviesunblocked.net',
-      },
-      timeout: 30000,
-      maxRedirects: 5,
-      validateStatus: false
+      }
     });
     
     if (response.status !== 200) {
@@ -107,18 +110,15 @@ export const downloadMovieBox = async (req, res) => {
     }
     filename += '.mp4';
     
-    const response = await axios({
+    const response = await streamAxios({
       method: 'GET',
       url: downloadUrl,
       responseType: 'stream',
-      httpsAgent: httpsAgent,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Referer': 'https://fmoviesunblocked.net/',
         'Origin': 'https://fmoviesunblocked.net',
-      },
-      timeout: 60000,
-      maxRedirects: 5
+      }
     });
     
     res.set({

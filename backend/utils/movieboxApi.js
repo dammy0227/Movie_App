@@ -27,17 +27,26 @@ const DEFAULT_HEADERS = {
 
 // Create HTTPS agent that ignores SSL errors (fix for Render)
 const httpsAgent = new https.Agent({
-    rejectUnauthorized: false
+    rejectUnauthorized: false,
+    keepAlive: true
 });
 
-// Session management
+// Session management - separate instances for different purposes
 const jar = new CookieJar();
-const axiosInstance = wrapper(axios.create({
+
+// Create two axios instances:
+// 1. For cookie-based requests (login, sessions)
+const cookieAxios = wrapper(axios.create({
     jar,
     withCredentials: true,
+    timeout: 30000
+}));
+
+// 2. For video streaming (no cookies needed, but needs SSL bypass)
+const streamAxios = axios.create({
     timeout: 30000,
     httpsAgent: httpsAgent
-}));
+});
 
 let cookiesInitialized = false;
 let lastRequestTime = 0;
@@ -69,7 +78,8 @@ async function ensureCookiesAreAssigned() {
             try {
                 console.log(`Trying host: ${host}`);
                 await rateLimit();
-                const response = await axiosInstance.get(`https://${host}/wefeed-h5-bff/app/get-latest-app-pkgs?app_name=moviebox`, {
+                // Use cookieAxios for session initialization (no custom agent)
+                const response = await cookieAxios.get(`https://${host}/wefeed-h5-bff/app/get-latest-app-pkgs?app_name=moviebox`, {
                     headers: { ...DEFAULT_HEADERS, Host: host },
                     timeout: 10000
                 });
@@ -89,6 +99,7 @@ async function ensureCookiesAreAssigned() {
     return cookiesInitialized;
 }
 
+// For API requests that need cookies (search, details, etc.)
 async function makeApiRequest(url, options = {}) {
     await ensureCookiesAreAssigned();
     await rateLimit();
@@ -97,15 +108,35 @@ async function makeApiRequest(url, options = {}) {
         url: url,
         headers: { ...DEFAULT_HEADERS, ...options.headers },
         withCredentials: true,
+        ...options
+    };
+    
+    try {
+        // Use cookieAxios for API requests
+        const response = await cookieAxios(config);
+        return response;
+    } catch (error) {
+        console.log(`Request failed to ${url.substring(0, 100)}:`, error.message);
+        throw error;
+    }
+}
+
+// For streaming requests (no cookies needed, uses SSL bypass)
+async function makeStreamRequest(url, options = {}) {
+    await rateLimit();
+    
+    const config = {
+        url: url,
+        headers: { ...DEFAULT_HEADERS, ...options.headers },
         httpsAgent: httpsAgent,
         ...options
     };
     
     try {
-        const response = await axiosInstance(config);
+        const response = await streamAxios(config);
         return response;
     } catch (error) {
-        console.log(`Request failed to ${url.substring(0, 100)}:`, error.message);
+        console.log(`Stream request failed:`, error.message);
         throw error;
     }
 }
@@ -140,7 +171,6 @@ export const searchMovieBox = async (title, year = null) => {
         
         const content = processApiResponse(response);
         
-        // Format results
         const results = (content.items || []).map(item => ({
             id: item.subjectId || item.id,
             title: item.title,
@@ -154,7 +184,6 @@ export const searchMovieBox = async (title, year = null) => {
             detailPath: item.detailPath
         }));
         
-        // If year provided, try to match by year
         if (year) {
             const exactMatch = results.find(r => r.year === year);
             if (exactMatch) return [exactMatch];
@@ -286,6 +315,7 @@ export const getMovieBoxSources = async (movieboxId, season = 0, episode = 0) =>
                         const content = processApiResponse(response);
                         if (content && content.downloads && content.downloads.length > 0) {
                             sourcesData = content;
+                            console.log(`✅ Found ${content.downloads.length} sources on ${host}`);
                             break;
                         }
                     }
@@ -297,10 +327,10 @@ export const getMovieBoxSources = async (movieboxId, season = 0, episode = 0) =>
         }
         
         if (!sourcesData || !sourcesData.downloads) {
+            console.log('❌ No sources found');
             return [];
         }
         
-        // Format sources
         return sourcesData.downloads.map(file => ({
             id: file.id,
             quality: file.resolution ? file.resolution + 'p' : 'Unknown',
@@ -318,13 +348,11 @@ export const getMovieBoxSources = async (movieboxId, season = 0, episode = 0) =>
 
 // Find MovieBox ID from TMDB data
 export const findMovieBoxId = async (tmdbData) => {
-    // Try by IMDb ID first (most reliable)
     if (tmdbData.imdb_id) {
         const result = await searchMovieBoxByImdbId(tmdbData.imdb_id);
         if (result) return result;
     }
     
-    // Try by title + year
     const title = tmdbData.title || tmdbData.name;
     const year = tmdbData.release_date?.substring(0, 4) || tmdbData.first_air_date?.substring(0, 4);
     
