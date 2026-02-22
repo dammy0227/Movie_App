@@ -1,6 +1,6 @@
 import API from "./api";
 
-const API_BASE = 'http://localhost:5000';
+const API_BASE = "https://movie-app-5oq9.onrender.com/api";
 
 export const getStreamUrl = (url) => {
   return `${API_BASE}/api/moviebox/stream?url=${encodeURIComponent(url)}`;
