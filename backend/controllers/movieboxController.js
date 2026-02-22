@@ -14,6 +14,45 @@ const streamAxios = axios.create({
     httpsAgent: httpsAgent
 });
 
+// Test endpoint to check connectivity
+export const testConnection = async (req, res) => {
+    const results = {};
+    const MIRROR_HOSTS = [
+        "h5.aoneroom.com",
+        "movieboxapp.in", 
+        "moviebox.pk",
+        "moviebox.ph",
+        "moviebox.id",
+        "v.moviebox.ph"
+    ];
+    
+    for (const host of MIRROR_HOSTS) {
+        try {
+            const start = Date.now();
+            const response = await axios.get(`https://${host}`, {
+                timeout: 5000,
+                httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
+            });
+            results[host] = {
+                reachable: true,
+                status: response.status,
+                time: Date.now() - start
+            };
+        } catch (error) {
+            results[host] = {
+                reachable: false,
+                error: error.message,
+                code: error.code
+            };
+        }
+    }
+    
+    res.json(results);
+};
+
 // Streaming endpoint
 export const streamMovieBox = async (req, res) => {
   try {

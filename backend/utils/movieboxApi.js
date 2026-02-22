@@ -2,6 +2,7 @@ import axios from 'axios';
 import { wrapper } from 'axios-cookiejar-support';
 import { CookieJar } from 'tough-cookie';
 import https from 'https';
+import { randomBytes } from 'crypto';
 
 // Configuration
 const MIRROR_HOSTS = [
@@ -19,32 +20,58 @@ const USER_AGENTS = [
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
     'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
     'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0'
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+    'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36 Edg/121.0.0.0',
+    'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0'
 ];
+
+// Generate a random session ID
+const generateSessionId = () => {
+    return randomBytes(16).toString('hex');
+};
+
+// Store session info
+let currentSessionId = generateSessionId();
+let currentWorkingHost = null;
+let cookiesInitialized = false;
+let lastRequestTime = 0;
+const RATE_LIMIT_DELAY = 8000; // Increased to 8 seconds to be safer
 
 // Get random user agent
 const getRandomUserAgent = () => {
     return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
 };
 
-// Base headers that will be enhanced per request
-const getBaseHeaders = (host) => ({
-    'Accept': 'application/json, text/plain, */*',
-    'Accept-Language': 'en-US,en;q=0.9',
-    'Accept-Encoding': 'gzip, deflate, br',
-    'User-Agent': getRandomUserAgent(),
-    'X-Client-Info': '{"timezone":"Africa/Nairobi"}',
-    'Connection': 'keep-alive',
-    'Host': host,
-    'Origin': `https://${host}`,
-    'Referer': `https://${host}/`,
-    'Sec-Fetch-Dest': 'empty',
-    'Sec-Fetch-Mode': 'cors',
-    'Sec-Fetch-Site': 'same-origin',
-    'X-Forwarded-For': `${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
-    'CF-Connecting-IP': `${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
-    'X-Real-IP': `${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`
-});
+// Enhanced headers that mimic a real browser more closely
+const getEnhancedHeaders = (host, referer = null) => {
+    const timestamp = Date.now();
+    const sessionId = currentSessionId;
+    
+    return {
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9,es;q=0.8,fr;q=0.7',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'User-Agent': getRandomUserAgent(),
+        'X-Client-Info': `{"timezone":"Africa/Nairobi","session":"${sessionId}","timestamp":${timestamp}}`,
+        'X-Requested-With': 'XMLHttpRequest',
+        'Connection': 'keep-alive',
+        'Host': host,
+        'Origin': `https://${host}`,
+        'Referer': referer || `https://${host}/`,
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'same-origin',
+        'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+        'Sec-Ch-Ua-Mobile': '?0',
+        'Sec-Ch-Ua-Platform': '"Windows"',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'X-Forwarded-For': `${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
+        'CF-Connecting-IP': `${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
+        'X-Real-IP': `${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`
+    };
+};
 
 // Create HTTPS agent that ignores SSL errors
 const httpsAgent = new https.Agent({
@@ -62,9 +89,30 @@ const cookieAxios = wrapper(axios.create({
     timeout: 30000
 }));
 
-let cookiesInitialized = false;
-let lastRequestTime = 0;
-const RATE_LIMIT_DELAY = 5000; // Increased to 5 seconds
+// Alternative API endpoints to try
+const ALTERNATIVE_ENDPOINTS = [
+    '/wefeed-h5-bff/web/subject/download',
+    '/wefeed-h5-bff/api/subject/download',
+    '/api/v1/subject/download',
+    '/wefeed/api/subject/download',
+    '/wefeed-h5-bff/web/resource/download',
+    '/api/resource/download'
+];
+
+// Additional referer domains
+const REFERER_DOMAINS = [
+    'https://fmoviesunblocked.net',
+    'https://fmovies.to',
+    'https://fmovies.hn',
+    'https://moviebox.ph',
+    'https://moviebox.pk',
+    'https://moviebox.app',
+    'https://h5.aoneroom.com',
+    'https://www.google.com',
+    'https://www.bing.com',
+    'https://www.youtube.com',
+    'https://www.netflix.com'
+];
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -93,7 +141,7 @@ async function ensureCookiesAreAssigned() {
                 console.log(`Trying host: ${host}`);
                 await rateLimit();
                 
-                const headers = getBaseHeaders(host);
+                const headers = getEnhancedHeaders(host);
                 const response = await cookieAxios.get(`https://${host}/wefeed-h5-bff/app/get-latest-app-pkgs?app_name=moviebox`, {
                     headers: headers,
                     timeout: 10000
@@ -102,9 +150,7 @@ async function ensureCookiesAreAssigned() {
                 if (response && response.data) {
                     console.log(`✅ Session initialized with host: ${host}`);
                     cookiesInitialized = true;
-                    
-                    // Store the working host
-                    global.workingHost = host;
+                    currentWorkingHost = host;
                     return true;
                 }
             } catch (error) {
@@ -124,9 +170,15 @@ async function makeApiRequest(url, options = {}) {
     // Extract host from URL
     const host = new URL(url).hostname;
     
+    // Rotate session ID occasionally
+    if (Math.random() > 0.8) {
+        currentSessionId = generateSessionId();
+        console.log('🔄 Rotated session ID');
+    }
+    
     // Generate fresh headers for each request
     const headers = {
-        ...getBaseHeaders(host),
+        ...getEnhancedHeaders(host),
         ...options.headers
     };
     
@@ -148,7 +200,8 @@ async function makeApiRequest(url, options = {}) {
                 console.log(`Got 403, retrying with different user agent (${i + 1}/${maxRetries})...`);
                 // Change user agent for retry
                 config.headers['User-Agent'] = getRandomUserAgent();
-                await sleep(2000);
+                // Add a small delay before retry
+                await sleep(3000);
                 continue;
             }
             throw error;
@@ -305,63 +358,95 @@ export const getMovieBoxSources = async (movieboxId, season = 0, episode = 0) =>
             return [];
         }
         
-        // Get download sources with enhanced headers
-        const refererDomains = [
-            'https://fmoviesunblocked.net',
-            'https://fmovies.to',
-            'https://moviebox.ph',
-            'https://moviebox.pk',
-            'https://h5.aoneroom.com'
-        ];
-        
         let sourcesData = null;
+        let lastError = null;
         
-        // Try with different referer domains
-        for (const refererDomain of refererDomains) {
+        // Try different endpoint paths and referer domains
+        for (const endpoint of ALTERNATIVE_ENDPOINTS) {
+            for (const refererDomain of REFERER_DOMAINS) {
+                try {
+                    // Rotate session ID occasionally
+                    if (Math.random() > 0.7) {
+                        currentSessionId = generateSessionId();
+                    }
+                    
+                    const refererUrl = detailPath 
+                        ? `${refererDomain}/spa/videoPlayPage/movies/${detailPath}?id=${movieboxId}&type=/movie/detail`
+                        : `${refererDomain}/spa/videoPlayPage/`;
+                    
+                    const params = {
+                        subjectId: movieboxId,
+                        se: season,
+                        ep: episode,
+                        _t: Date.now() // Add timestamp to bypass cache
+                    };
+                    
+                    console.log(`Trying ${workingHost}${endpoint} with referer ${refererDomain}`);
+                    
+                    // Generate fresh headers for this attempt
+                    const headers = {
+                        ...getEnhancedHeaders(workingHost, refererUrl),
+                        'Origin': refererDomain,
+                        'Sec-Fetch-Site': 'cross-site'
+                    };
+                    
+                    const response = await makeApiRequest(`https://${workingHost}${endpoint}`, {
+                        method: 'GET',
+                        params: params,
+                        headers: headers,
+                        timeout: 15000
+                    });
+                    
+                    if (response && response.data) {
+                        const content = processApiResponse(response);
+                        if (content && content.downloads && content.downloads.length > 0) {
+                            sourcesData = content;
+                            console.log(`✅ Found ${content.downloads.length} sources with ${endpoint}`);
+                            break;
+                        }
+                    }
+                } catch (error) {
+                    lastError = error;
+                    console.log(`❌ Failed:`, error.message);
+                    continue;
+                }
+            }
+            if (sourcesData) break;
+        }
+        
+        // Fallback: Try a completely different approach - use search API
+        if (!sourcesData || !sourcesData.downloads) {
+            console.log('🔄 Trying fallback approach...');
+            
             try {
-                const refererUrl = detailPath 
-                    ? `${refererDomain}/spa/videoPlayPage/movies/${detailPath}?id=${movieboxId}&type=/movie/detail`
-                    : `${refererDomain}/spa/videoPlayPage/`;
-                
-                const params = {
-                    subjectId: movieboxId,
-                    se: season,
-                    ep: episode
-                };
-                
-                console.log(`Trying ${workingHost} with referer ${refererDomain}`);
-                
-                // Generate fresh headers for this attempt
-                const headers = {
-                    ...getBaseHeaders(workingHost),
-                    'Referer': refererUrl,
-                    'Origin': refererDomain,
-                    'Sec-Fetch-Site': 'cross-site'
-                };
-                
-                const response = await makeApiRequest(`https://${workingHost}/wefeed-h5-bff/web/subject/download`, {
-                    method: 'GET',
-                    params: params,
-                    headers: headers,
-                    timeout: 15000
+                const fallbackResponse = await makeApiRequest(`https://${workingHost}/wefeed-h5-bff/web/subject/search`, {
+                    method: 'POST',
+                    data: {
+                        keyword: movieboxId.toString(),
+                        page: 1,
+                        perPage: 1,
+                        subjectType: 0
+                    },
+                    timeout: 10000
                 });
                 
-                if (response && response.data) {
-                    const content = processApiResponse(response);
-                    if (content && content.downloads && content.downloads.length > 0) {
-                        sourcesData = content;
-                        console.log(`✅ Found ${content.downloads.length} sources with referer ${refererDomain}`);
-                        break;
+                if (fallbackResponse && fallbackResponse.data) {
+                    const content = processApiResponse(fallbackResponse);
+                    if (content.items && content.items[0] && content.items[0].resource) {
+                        const resource = content.items[0].resource;
+                        if (resource.downloads) {
+                            sourcesData = resource;
+                            console.log(`✅ Found ${resource.downloads.length} sources via fallback`);
+                        }
                     }
                 }
-            } catch (error) {
-                console.log(`❌ Failed with referer ${refererDomain}:`, error.message);
-                continue;
+            } catch (fallbackError) {
+                console.log('❌ Fallback failed:', fallbackError.message);
             }
         }
         
         if (!sourcesData || !sourcesData.downloads) {
-            console.log('❌ No sources found');
+            console.log('❌ No sources found after all attempts');
             return [];
         }
         
@@ -375,7 +460,7 @@ export const getMovieBoxSources = async (movieboxId, season = 0, episode = 0) =>
         }));
         
     } catch (error) {
-        console.error('Get sources error:', error.message);
+        console.error('❌ Get sources error:', error.message);
         return [];
     }
 };
