@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+// TVShows.jsx - Optimized with memoization
+
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Navbar from '../components/Navbar';
@@ -48,23 +50,34 @@ const TVShows = () => {
       setActiveCategory(category);
     } else {
       setActiveCategory('trending');
-      // Update URL if needed
       if (!category && !search) {
         navigate('/tv?category=trending', { replace: true });
       }
     }
   }, [location.search, navigate]);
 
-  // Fetch all categories
+  // Fetch all categories only once on mount
   useEffect(() => {
-    dispatch(fetchTrendingTV());
-    dispatch(fetchPopularTV());
-    dispatch(fetchTopRatedTV());
-    dispatch(fetchAiringTodayTV());
-    dispatch(fetchOnTheAirTV());
-  }, [dispatch]);
+    let mounted = true;
+    
+    const fetchData = () => {
+      if (mounted) {
+        dispatch(fetchTrendingTV());
+        dispatch(fetchPopularTV());
+        dispatch(fetchTopRatedTV());
+        dispatch(fetchAiringTodayTV());
+        dispatch(fetchOnTheAirTV());
+      }
+    };
+    
+    fetchData();
+    
+    return () => {
+      mounted = false;
+    };
+  }, []); // Empty dependency array - run once
 
-  // Handle search
+  // Handle search with debounce
   useEffect(() => {
     if (searchQuery.trim()) {
       setIsSearching(true);
@@ -73,10 +86,13 @@ const TVShows = () => {
           await dispatch(fetchTVSearch(searchQuery));
           setActiveCategory('search');
           navigate(`/tv?search=${encodeURIComponent(searchQuery)}`, { replace: true });
+        } catch (error) {
+          console.error('Search failed:', error);
         } finally {
           setIsSearching(false);
         }
       }, 500);
+      
       return () => {
         clearTimeout(timer);
         setIsSearching(false);
@@ -84,41 +100,62 @@ const TVShows = () => {
     }
   }, [searchQuery, dispatch, navigate]);
 
-  const handleTVShowClick = (show) => {
+  // Memoize handlers
+  const handleTVShowClick = useCallback((show) => {
     navigate(`/tv/${show.id}`);
-  };
+  }, [navigate]);
 
-  const handleCategoryChange = (categoryId) => {
+  const handleCategoryChange = useCallback((categoryId) => {
     setActiveCategory(categoryId);
     setSearchQuery(''); 
     navigate(`/tv?category=${categoryId}`);
-  };
+  }, [navigate]);
 
-  const handleClearSearch = () => {
+  const handleClearSearch = useCallback(() => {
     setSearchQuery('');
     handleCategoryChange('trending');
-  };
+  }, [handleCategoryChange]);
 
-  const categories = [
+  // Memoize categories
+  const categories = useMemo(() => [
     { id: 'trending', title: 'Trending TV Shows', shows: trending, count: trending.length },
     { id: 'popular', title: 'Popular TV Shows', shows: popular, count: popular.length },
     { id: 'topRated', title: 'Top Rated TV Shows', shows: topRated, count: topRated.length },
     { id: 'airingToday', title: 'Airing Today', shows: airingToday, count: airingToday.length },
     { id: 'onTheAir', title: 'On The Air', shows: onTheAir, count: onTheAir.length },
-  ];
+  ], [trending, popular, topRated, airingToday, onTheAir]);
 
-  const displayShows = activeCategory === 'search' ? searchResults : 
-    categories.find(c => c.id === activeCategory)?.shows || [];
+  // Memoize display shows
+  const displayShows = useMemo(() => {
+    if (activeCategory === 'search') {
+      return searchResults;
+    }
+    const category = categories.find(c => c.id === activeCategory);
+    return category?.shows || [];
+  }, [activeCategory, categories, searchResults]);
 
-  const getCategoryTitle = () => {
+  // Memoize category title
+  const categoryTitle = useMemo(() => {
     if (activeCategory === 'search') {
       return `Search Results for "${searchQuery}"`;
     }
     const category = categories.find(c => c.id === activeCategory);
     return category?.title || 'TV Shows';
-  };
+  }, [activeCategory, categories, searchQuery]);
 
-  // Show loading spinner while loading and no data
+  // Memoize formatted shows for MovieRow
+  const formattedShows = useMemo(() => 
+    displayShows.map(show => ({
+      id: show.id,
+      title: show.name,
+      poster_path: show.poster_path,
+      vote_average: show.vote_average,
+      release_date: show.first_air_date
+    })),
+    [displayShows]
+  );
+
+  // Initial loading state
   if (loading && !trending.length && !popular.length && !searchResults.length && !isSearching) {
     return (
       <div className="min-h-screen bg-black">
@@ -137,11 +174,11 @@ const TVShows = () => {
         <div className="flex items-center mb-8">
           <Tv className="w-8 h-8 text-red-600 mr-3" />
           <h1 className="text-3xl sm:text-4xl font-bold text-white">
-            {getCategoryTitle()}
+            {categoryTitle}
           </h1>
         </div>
 
-        {/* Search Bar with Loading Indicator */}
+        {/* Search Bar */}
         <div className="relative max-w-md mb-6">
           <input
             type="text"
@@ -152,7 +189,6 @@ const TVShows = () => {
           />
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           
-          {/* Search Loading Indicator */}
           {isSearching && (
             <div className="absolute right-4 top-1/2 -translate-y-1/2">
               <div className="w-5 h-5 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
@@ -188,7 +224,7 @@ const TVShows = () => {
 
         {error && <ErrorMessage message={error} />}
 
-        {/* Loading state */}
+        {/* Search loading state */}
         {isSearching && (
           <div className="flex justify-center py-12">
             <LoadingSpinner />
@@ -204,13 +240,7 @@ const TVShows = () => {
           ) : displayShows.length > 0 ? (
             <MovieRow
               title=""
-              movies={displayShows.map(show => ({
-                id: show.id,
-                title: show.name,
-                poster_path: show.poster_path,
-                vote_average: show.vote_average,
-                release_date: show.first_air_date
-              }))}
+              movies={formattedShows}
               onMovieClick={handleTVShowClick}
             />
           ) : (

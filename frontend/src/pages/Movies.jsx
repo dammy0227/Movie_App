@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+// Movies.jsx - Add memoization and prevent unnecessary re-renders
+
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useLocation } from 'react-router-dom'; 
 import Navbar from '../components/Navbar';
@@ -48,16 +50,28 @@ const Movies = () => {
     }
   }, [location.search]);
 
-  // Fetch all categories
+  // Fetch all categories only once on mount
   useEffect(() => {
-    dispatch(fetchTrending());
-    dispatch(fetchPopular());
-    dispatch(fetchTopRated());
-    dispatch(fetchNowPlaying());
-    dispatch(fetchUpcoming());
-  }, [dispatch]);
+    let mounted = true;
+    
+    const fetchData = async () => {
+      if (mounted) {
+        dispatch(fetchTrending());
+        dispatch(fetchPopular());
+        dispatch(fetchTopRated());
+        dispatch(fetchNowPlaying());
+        dispatch(fetchUpcoming());
+      }
+    };
+    
+    fetchData();
+    
+    return () => {
+      mounted = false;
+    };
+  }, []); // Empty dependency array - only run once
 
-  // Handle search
+  // Handle search with debounce
   useEffect(() => {
     if (searchQuery.trim()) {
       setIsSearching(true);
@@ -66,10 +80,13 @@ const Movies = () => {
           await dispatch(fetchSearch(searchQuery));
           setActiveCategory('search');
           navigate(`/movies?search=${encodeURIComponent(searchQuery)}`, { replace: true });
+        } catch (error) {
+          console.error('Search failed:', error);
         } finally {
           setIsSearching(false);
         }
       }, 500);
+      
       return () => {
         clearTimeout(delayDebounce);
         setIsSearching(false);
@@ -77,7 +94,7 @@ const Movies = () => {
     } else {
       dispatch(clearSearch());
       setIsSearching(false);
-      // If search is cleared and no category in URL, set to trending
+      
       const params = new URLSearchParams(location.search);
       if (!params.get('category')) {
         navigate('/movies?category=trending', { replace: true });
@@ -85,43 +102,46 @@ const Movies = () => {
     }
   }, [searchQuery, dispatch, navigate, location.search]);
 
-  const handleMovieClick = (movie) => {
+  // Memoize handlers to prevent unnecessary re-renders
+  const handleMovieClick = useCallback((movie) => {
     navigate(`/movie/${movie.id}`);
-  };
+  }, [navigate]);
 
-  const handleCategoryChange = (categoryId) => {
+  const handleCategoryChange = useCallback((categoryId) => {
     setActiveCategory(categoryId);
-    setSearchQuery(''); // Clear search when changing category
+    setSearchQuery('');
     navigate(`/movies?category=${categoryId}`);
-  };
+  }, [navigate]);
 
-  const categories = [
+  // Memoize categories to prevent recalculation
+  const categories = useMemo(() => [
     { id: 'trending', title: 'Trending Now', movies: trending, count: trending.length },
     { id: 'popular', title: 'Popular Movies', movies: popular, count: popular.length },
     { id: 'topRated', title: 'Top Rated', movies: topRated, count: topRated.length },
     { id: 'nowPlaying', title: 'Now Playing', movies: nowPlaying, count: nowPlaying.length },
     { id: 'upcoming', title: 'Upcoming Releases', movies: upcoming, count: upcoming.length },
-  ];
+  ], [trending, popular, topRated, nowPlaying, upcoming]);
 
-  const getDisplayMovies = () => {
+  // Memoize display movies
+  const displayMovies = useMemo(() => {
     if (activeCategory === 'search') {
       return searchResults;
     }
     const category = categories.find(c => c.id === activeCategory);
     return category?.movies || [];
-  };
+  }, [activeCategory, categories, searchResults]);
 
-  const getCategoryTitle = () => {
+  // Memoize category title
+  const categoryTitle = useMemo(() => {
     if (activeCategory === 'search') {
       return `Search Results for "${searchQuery}"`;
     }
     const category = categories.find(c => c.id === activeCategory);
     return category?.title || 'Movies';
-  };
+  }, [activeCategory, categories, searchQuery]);
 
-  const displayMovies = getDisplayMovies();
-
-  if (loading && !trending.length && !popular.length) {
+  // Show loading only on initial load
+  if (loading && !trending.length && !popular.length && !searchResults.length) {
     return (
       <div className="min-h-screen bg-black">
         <Navbar />
@@ -139,10 +159,10 @@ const Movies = () => {
       <div className="pt-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl sm:text-4xl font-bold text-white mb-4">
-            {getCategoryTitle()}
+            {categoryTitle}
           </h1>
           
-          {/* Search Bar with Loading Indicator */}
+          {/* Search Bar */}
           <div className="relative max-w-md mb-6">
             <input
               type="text"
@@ -153,7 +173,6 @@ const Movies = () => {
             />
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             
-            {/* Search Loading Indicator */}
             {isSearching && (
               <div className="absolute right-4 top-1/2 -translate-y-1/2">
                 <div className="w-5 h-5 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
@@ -183,7 +202,6 @@ const Movies = () => {
             </div>
           )}
           
-          {/* Results count */}
           {displayMovies.length > 0 && (
             <p className="text-sm text-gray-400">
               Showing {displayMovies.length} movies
@@ -218,7 +236,6 @@ const Movies = () => {
           )
         )}
         
-        {/* Loading state when searching */}
         {isSearching && (
           <div className="flex justify-center py-12">
             <LoadingSpinner />
