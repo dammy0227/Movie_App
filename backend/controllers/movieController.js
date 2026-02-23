@@ -67,35 +67,21 @@ export const movieDetails = async (req, res) => {
       );
     }
 
-    // MovieBox sources - only if requested and with timeout
+    // MovieBox sources - only if requested - NO TIMEOUTS
     if (includeSources === "true") {
       promises.push(
         (async () => {
           try {
             console.log(`Looking for MovieBox sources for TMDB ID: ${tmdbId}`);
             
-            // Set timeout for this operation (5 seconds max)
-            const timeoutPromise = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('MovieBox timeout')), 5000)
-            );
-            
-            const movieboxInfo = await Promise.race([
-              findMovieBoxId(tmdbData),
-              timeoutPromise
-            ]);
+            // NO TIMEOUT - let it run
+            const movieboxInfo = await findMovieBoxId(tmdbData);
             
             if (movieboxInfo) {
               console.log(`Found MovieBox match: ${movieboxInfo.title} (ID: ${movieboxInfo.id})`);
               
-              // Get sources with timeout
-              const sourcesTimeout = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Sources timeout')), 5000)
-              );
-              
-              const movieboxSources = await Promise.race([
-                getMovieBoxSources(movieboxInfo.id),
-                sourcesTimeout
-              ]);
+              // NO TIMEOUT - let it run
+              const movieboxSources = await getMovieBoxSources(movieboxInfo.id);
               
               console.log(`Found ${movieboxSources.length} sources`);
               
@@ -117,8 +103,7 @@ export const movieDetails = async (req, res) => {
       );
     }
 
-    // Wait for all promises to complete (or timeout) in the background
-    // Don't await - let them run in background while we return the response
+    // Wait for all promises to complete in the background
     Promise.allSettled(promises).then(() => {
       // Cache the final result after all promises settle
       movieCache.set(cacheKey, {
@@ -136,55 +121,44 @@ export const movieDetails = async (req, res) => {
   }
 };
 
-// Optimized endpoint for sources only (called when user clicks "Watch Now")
+// Get movie sources - NO TIMEOUT
 export const getMovieSources = async (req, res) => {
   try {
     const { tmdbId } = req.params;
     const { season, episode } = req.query;
     
-    // Set a timeout for the entire request
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Request timeout')), 8000)
+    console.log(`🔍 Getting sources for Movie ID: ${tmdbId}`);
+    
+    // Get TMDB data first
+    const tmdbData = await getMovieDetails(tmdbId);
+    
+    if (!tmdbData) {
+      return res.json({ sources: [] });
+    }
+    
+    // Find MovieBox ID (has its own retry logic)
+    const movieboxInfo = await findMovieBoxId(tmdbData);
+    
+    if (!movieboxInfo) {
+      return res.json({ sources: [] });
+    }
+    
+    // Get sources (has its own retry logic)
+    const sources = await getMovieBoxSources(
+      movieboxInfo.id, 
+      season ? parseInt(season) : 0,
+      episode ? parseInt(episode) : 0
     );
     
-    const result = await Promise.race([
-      (async () => {
-        // Get TMDB data first
-        const tmdbData = await getMovieDetails(tmdbId);
-        
-        if (!tmdbData) {
-          throw new Error('Movie not found');
-        }
-        
-        // Find MovieBox ID
-        const movieboxInfo = await findMovieBoxId(tmdbData);
-        
-        if (!movieboxInfo) {
-          return { sources: [] };
-        }
-        
-        // Get sources
-        const sources = await getMovieBoxSources(
-          movieboxInfo.id, 
-          season ? parseInt(season) : 0,
-          episode ? parseInt(episode) : 0
-        );
-        
-        return {
-          tmdbId,
-          movieboxId: movieboxInfo.id,
-          title: movieboxInfo.title,
-          sources: sources
-        };
-      })(),
-      timeoutPromise
-    ]);
-    
-    res.json(result);
+    res.json({
+      tmdbId,
+      movieboxId: movieboxInfo.id,
+      title: movieboxInfo.title,
+      sources: sources
+    });
     
   } catch (error) {
     console.error('Get movie sources error:', error);
-    // Return empty sources on error instead of failing
     res.json({ sources: [] });
   }
 };
