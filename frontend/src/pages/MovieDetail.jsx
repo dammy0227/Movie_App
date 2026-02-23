@@ -1,4 +1,4 @@
-// MovieDetail.jsx - Optimized with priority loading
+// MovieDetail.jsx - Optimized with Netflix-style instant trailer
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
@@ -36,8 +36,9 @@ const MovieDetail = () => {
   // Trailer state
   const [trailerKey, setTrailerKey] = useState('');
   const [isMuted, setIsMuted] = useState(true);
-  const [showTrailerInHero, setShowTrailerInHero] = useState(false);
+  const [showTrailer, setShowTrailer] = useState(false);
   const [trailerError, setTrailerError] = useState(false);
+  const [trailerLoaded, setTrailerLoaded] = useState(false);
   
   // UI state
   const [isMobile, setIsMobile] = useState(false);
@@ -122,10 +123,27 @@ const MovieDetail = () => {
       const video = trailer || teaser;
       if (video?.key) {
         setTrailerKey(video.key);
-        setShowTrailerInHero(true);
+        setShowTrailer(true); // Show trailer immediately on all devices
+        
+        // Preload the trailer
+        const tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        document.body.appendChild(tag);
       }
     }
   }, [details]);
+
+  // ============= OPTIMIZED: Load sources in background =============
+  useEffect(() => {
+    // Pre-fetch sources in background when movie loads
+    if (details?.id) {
+      dispatch(fetchMovieSources(id)).then((result) => {
+        if (result.payload?.sources) {
+          console.log('✅ Pre-fetched sources in background');
+        }
+      }).catch(err => console.log('Background pre-fetch failed'));
+    }
+  }, [details?.id, dispatch]);
 
   // ============= OPTIMIZED: Load sources only when user clicks =============
   const handleGetSources = async () => {
@@ -134,13 +152,8 @@ const MovieDetail = () => {
     if (!showSources && (!sources || sources.length === 0)) {
       setLoadingSources(true);
       
-      // Single attempt with timeout - don't retry multiple times
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-        
         const result = await dispatch(fetchMovieSources(id)).unwrap();
-        clearTimeout(timeoutId);
         
         if (result?.sources) {
           setSources(result.sources);
@@ -166,14 +179,14 @@ const MovieDetail = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // YouTube player options
+  // YouTube player options - Netflix style
   const opts = useMemo(() => ({
     height: '100%',
     width: '100%',
     playerVars: {
-      autoplay: isMobile ? 0 : 1,
-      mute: isMobile ? 0 : 1,
-      controls: isMobile ? 1 : 0,
+      autoplay: 1, // Always autoplay
+      mute: 1, // Start muted (Netflix style)
+      controls: 0, // Hide controls initially
       showinfo: 0,
       rel: 0,
       loop: 1,
@@ -182,13 +195,24 @@ const MovieDetail = () => {
       iv_load_policy: 3,
       disablekb: 1,
       fs: 0,
+      origin: window.location.origin,
+      enablejsapi: 1,
+      widget_referrer: window.location.origin,
+      playsinline: 1 // Important for mobile
     },
-  }), [trailerKey, isMobile]);
+  }), [trailerKey]);
 
   const onPlayerReady = (event) => {
     playerRef.current = event.target;
-    if (!isMobile) {
-      event.target.mute();
+    setTrailerLoaded(true);
+    
+    // Start playing immediately
+    event.target.playVideo();
+  };
+
+  const onPlayerStateChange = (event) => {
+    // When video ends, restart
+    if (event.data === 0) {
       event.target.playVideo();
     }
   };
@@ -204,7 +228,8 @@ const MovieDetail = () => {
     }
   }, [isMuted]);
 
-  const onPlayerError = () => {
+  const onPlayerError = (error) => {
+    console.log('YouTube error:', error);
     setTrailerError(true);
   };
 
@@ -255,7 +280,6 @@ const MovieDetail = () => {
   };
 
   const handleRatingSubmit = async ({ rating, review }) => {
-    // Keep your existing rating logic
     console.log('Rating submitted:', rating, review);
     setShowRatingModal(false);
   };
@@ -275,7 +299,6 @@ const MovieDetail = () => {
         <Navbar />
         <div className="pt-24 px-4 max-w-7xl mx-auto">
           <div className="animate-pulse">
-            {/* Skeleton loader */}
             <div className="h-[50vh] md:h-[70vh] bg-gray-800 rounded-lg mb-8"></div>
             <div className="flex flex-col md:flex-row gap-8">
               <div className="md:w-1/3 lg:w-1/4">
@@ -312,29 +335,55 @@ const MovieDetail = () => {
     <div className="min-h-screen bg-black pb-7">
       <Navbar />
       
-      {/* Hero Section */}
-      <div className="relative h-[50vh] md:h-[70vh] w-full overflow-hidden">
-        {showTrailerInHero && trailerKey && !trailerError ? (
+      {/* Hero Section - Netflix style with instant trailer on all devices */}
+      <div className="relative h-[50vh] md:h-[70vh] w-full overflow-hidden bg-black">
+        {showTrailer && trailerKey && !trailerError ? (
           <>
+            {/* Trailer Background */}
             <div className="absolute inset-0">
               <YouTube
                 videoId={trailerKey}
                 opts={opts}
                 onReady={onPlayerReady}
+                onStateChange={onPlayerStateChange}
                 onError={onPlayerError}
-                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[calc(100%+100px)] h-[calc(100%+100px)]"
-                style={{ pointerEvents: 'none' }}
+                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full h-full"
+                style={{ 
+                  pointerEvents: 'none',
+                  objectFit: 'cover'
+                }}
               />
             </div>
+            
+            {/* Gradient Overlay */}
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
             
-            {!isMobile && (
-              <button
-                onClick={toggleMute}
-                className="absolute bottom-24 right-8 z-20 bg-black/50 p-3 rounded-full hover:bg-black/70 transition"
-              >
-                {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
-              </button>
+            {/* Netflix-style Title Overlay */}
+            <div className="absolute bottom-24 left-8 md:left-16 z-10 text-white">
+              <h1 className="text-4xl md:text-6xl font-bold mb-4">{details.title}</h1>
+              <div className="flex items-center gap-4 text-sm md:text-base">
+                <span className="text-green-500 font-semibold">Now Playing</span>
+                <span>•</span>
+                <span>{new Date(details.release_date).getFullYear()}</span>
+                <span>•</span>
+                <span>{details.runtime} min</span>
+              </div>
+            </div>
+            
+            {/* Sound Toggle Button */}
+            <button
+              onClick={toggleMute}
+              className="absolute bottom-24 right-8 z-20 bg-black/50 p-3 rounded-full hover:bg-black/70 transition"
+              aria-label={isMuted ? "Unmute" : "Mute"}
+            >
+              {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
+            </button>
+
+            {/* Loading Indicator */}
+            {!trailerLoaded && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <LoadingSpinner />
+              </div>
             )}
           </>
         ) : (
@@ -343,9 +392,21 @@ const MovieDetail = () => {
               src={`https://image.tmdb.org/t/p/original${details.backdrop_path}`}
               alt={details.title}
               className="w-full h-full object-cover"
-              loading="eager" // Load backdrop immediately
+              loading="eager"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
+            
+            {/* Play button overlay if trailer failed */}
+            {trailerKey && trailerError && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <button 
+                  onClick={() => setTrailerError(false)}
+                  className="bg-red-600 rounded-full p-4 hover:bg-red-700 transition"
+                >
+                  <Play className="w-12 h-12 text-white" />
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -353,7 +414,7 @@ const MovieDetail = () => {
       {/* Movie Details */}
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-24 md:-mt-48">
         <div className="flex flex-col md:flex-row gap-8">
-          {/* Poster - Load immediately */}
+          {/* Poster */}
           <div className="md:w-1/3 lg:w-1/4">
             <img
               src={`https://image.tmdb.org/t/p/w500${details.poster_path}`}
@@ -363,7 +424,7 @@ const MovieDetail = () => {
             />
           </div>
 
-          {/* Info - Load immediately */}
+          {/* Info */}
           <div className="md:w-2/3 lg:w-3/4 text-white">
             <h1 className="text-3xl md:text-5xl font-bold mb-2">{details.title}</h1>
             
@@ -394,7 +455,7 @@ const MovieDetail = () => {
               ))}
             </div>
 
-            {/* Rating Display - Show skeleton if not loaded yet */}
+            {/* Rating Display */}
             {itemRatings ? (
               <div className="mb-6">
                 <RatingDisplay
@@ -417,7 +478,7 @@ const MovieDetail = () => {
               </p>
             </div>
 
-            {/* Cast - Load lazily when scrolled into view */}
+            {/* Cast */}
             <div id="cast-section">
               {castLoaded && details.credits?.cast?.length > 0 && (
                 <div className="mb-8">

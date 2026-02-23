@@ -1,4 +1,4 @@
-// TVDetail.jsx - Optimized with priority loading
+// TVDetail.jsx - Optimized with Netflix-style instant trailer
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
@@ -45,8 +45,9 @@ const TVDetail = () => {
   // Trailer state
   const [trailerKey, setTrailerKey] = useState('');
   const [isMuted, setIsMuted] = useState(true);
-  const [showTrailerInHero, setShowTrailerInHero] = useState(false);
+  const [showTrailer, setShowTrailer] = useState(false);
   const [trailerError, setTrailerError] = useState(false);
+  const [trailerLoaded, setTrailerLoaded] = useState(false);
   
   // UI state
   const [isMobile, setIsMobile] = useState(false);
@@ -158,19 +159,40 @@ const TVDetail = () => {
       );
       if (trailer?.key) {
         setTrailerKey(trailer.key);
-        setShowTrailerInHero(true);
+        setShowTrailer(true); // Show trailer immediately on all devices
+        
+        // Preload the YouTube iframe API
+        const tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        document.body.appendChild(tag);
       }
     }
   }, [details]);
 
-  // YouTube player options
+  // ============= Pre-fetch episode sources in background =============
+  useEffect(() => {
+    // Pre-fetch sources for first episode in background
+    if (details?.id) {
+      dispatch(fetchTVEpisodeSources({
+        tvId: id,
+        season: 1,
+        episode: 1
+      })).then((result) => {
+        if (result.payload?.sources) {
+          console.log('✅ Pre-fetched episode sources in background');
+        }
+      }).catch(err => console.log('Background pre-fetch failed'));
+    }
+  }, [details?.id, id, dispatch]);
+
+  // YouTube player options - Netflix style
   const opts = useMemo(() => ({
     height: '100%',
     width: '100%',
     playerVars: {
-      autoplay: isMobile ? 0 : 1,
-      mute: isMobile ? 0 : 1,
-      controls: isMobile ? 1 : 0,
+      autoplay: 1, // Always autoplay
+      mute: 1, // Start muted (Netflix style)
+      controls: 0, // Hide controls
       showinfo: 0,
       rel: 0,
       loop: 1,
@@ -179,13 +201,24 @@ const TVDetail = () => {
       iv_load_policy: 3,
       disablekb: 1,
       fs: 0,
+      origin: window.location.origin,
+      enablejsapi: 1,
+      widget_referrer: window.location.origin,
+      playsinline: 1 // Important for mobile
     },
-  }), [trailerKey, isMobile]);
+  }), [trailerKey]);
 
   const onPlayerReady = (event) => {
     playerRef.current = event.target;
-    if (!isMobile) {
-      event.target.mute();
+    setTrailerLoaded(true);
+    
+    // Start playing immediately
+    event.target.playVideo();
+  };
+
+  const onPlayerStateChange = (event) => {
+    // When video ends, restart
+    if (event.data === 0) {
       event.target.playVideo();
     }
   };
@@ -201,7 +234,8 @@ const TVDetail = () => {
     }
   }, [isMuted]);
 
-  const onPlayerError = () => {
+  const onPlayerError = (error) => {
+    console.log('YouTube error:', error);
     setTrailerError(true);
   };
 
@@ -241,24 +275,17 @@ const TVDetail = () => {
     setShowAISummary(!showAISummary);
   }, [dispatch, details, showAISummary]);
 
-  // ============= OPTIMIZED: Load sources only when requested =============
   const handleGetEpisodeSources = async () => {
     setShowSources(!showSources);
     if (!showSources) {
       setLoadingSources(true);
       
-      // Single attempt with timeout
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-        
         const result = await dispatch(fetchTVEpisodeSources({
           tvId: id,
           season: selectedSeason,
           episode: selectedEpisode
         })).unwrap();
-        
-        clearTimeout(timeoutId);
         
         if (result?.sources) {
           setSources(result.sources);
@@ -368,29 +395,55 @@ const TVDetail = () => {
     <div className="min-h-screen bg-black">
       <Navbar />
       
-      {/* Hero Section */}
-      <div className="relative h-[50vh] md:h-[70vh] w-full overflow-hidden">
-        {showTrailerInHero && trailerKey && !trailerError ? (
+      {/* Hero Section - Netflix style with instant trailer on all devices */}
+      <div className="relative h-[50vh] md:h-[70vh] w-full overflow-hidden bg-black">
+        {showTrailer && trailerKey && !trailerError ? (
           <>
+            {/* Trailer Background */}
             <div className="absolute inset-0">
               <YouTube
                 videoId={trailerKey}
                 opts={opts}
                 onReady={onPlayerReady}
+                onStateChange={onPlayerStateChange}
                 onError={onPlayerError}
-                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[calc(100%+100px)] h-[calc(100%+100px)]"
-                style={{ pointerEvents: 'none' }}
+                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full h-full"
+                style={{ 
+                  pointerEvents: 'none',
+                  objectFit: 'cover'
+                }}
               />
             </div>
+            
+            {/* Gradient Overlay */}
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
             
-            {!isMobile && (
-              <button
-                onClick={toggleMute}
-                className="absolute bottom-24 right-8 z-20 bg-black/50 p-3 rounded-full hover:bg-black/70 transition"
-              >
-                {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
-              </button>
+            {/* Netflix-style Title Overlay */}
+            <div className="absolute bottom-24 left-8 md:left-16 z-10 text-white">
+              <h1 className="text-4xl md:text-6xl font-bold mb-4">{details.name}</h1>
+              <div className="flex items-center gap-4 text-sm md:text-base">
+                <span className="text-green-500 font-semibold">Now Playing</span>
+                <span>•</span>
+                <span>{details.first_air_date?.slice(0, 4) || 'N/A'}</span>
+                <span>•</span>
+                <span>{details.number_of_seasons} Season{details.number_of_seasons !== 1 ? 's' : ''}</span>
+              </div>
+            </div>
+            
+            {/* Sound Toggle Button - Always visible */}
+            <button
+              onClick={toggleMute}
+              className="absolute bottom-24 right-8 z-20 bg-black/50 p-3 rounded-full hover:bg-black/70 transition"
+              aria-label={isMuted ? "Unmute" : "Mute"}
+            >
+              {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
+            </button>
+
+            {/* Loading Indicator */}
+            {!trailerLoaded && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <LoadingSpinner />
+              </div>
             )}
           </>
         ) : (
@@ -405,6 +458,18 @@ const TVDetail = () => {
               loading="eager"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
+            
+            {/* Play button overlay if trailer failed */}
+            {trailerKey && trailerError && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <button 
+                  onClick={() => setTrailerError(false)}
+                  className="bg-red-600 rounded-full p-4 hover:bg-red-700 transition"
+                >
+                  <Play className="w-12 h-12 text-white" />
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
