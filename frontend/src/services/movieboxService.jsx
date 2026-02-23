@@ -1,21 +1,24 @@
-import API from "./api";
+// Cloudflare Worker URL for streaming/downloading
+const WORKER_URL = 'https://movieapp.fatunsindamilare1.workers.dev';
 
-// Get stream URL - returns the full URL to the backend stream endpoint
+// ✅ UPDATED: Now uses Cloudflare Worker
 export const getStreamUrl = (url) => {
-  // Return the actual URL string, not a promise
-  return `${API.defaults.baseURL}/moviebox/stream?url=${encodeURIComponent(url)}`;
+  return `${WORKER_URL}/api/moviebox/stream?url=${encodeURIComponent(url)}`;
 };
 
-// Get download URL - returns the full URL to the backend download endpoint
+// ✅ UPDATED: Now uses Cloudflare Worker
 export const getDownloadUrl = (url, title = "video", quality = "") => {
-  const params = new URLSearchParams({ url, title, quality });
-  return `${API.defaults.baseURL}/moviebox/download?${params}`;
+  const params = new URLSearchParams({ 
+    url, 
+    title: title || "video", 
+    quality: quality || "" 
+  });
+  return `${WORKER_URL}/api/moviebox/download?${params.toString()}`;
 };
 
-// Direct URL (no backend)
+// Keep these as they are
 export const getDirectUrl = (url) => url;
 
-// Format file size
 export const formatFileSize = (bytes) => {
   if (!bytes) return "Unknown size";
   const sizes = ["Bytes", "KB", "MB", "GB"];
